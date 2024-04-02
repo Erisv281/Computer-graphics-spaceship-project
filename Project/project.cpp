@@ -12,6 +12,9 @@
 #include <math.h>
 #include <iostream>
 
+// My own includes
+#include "./GameData/Spaceship.h"
+
 
 
 // Lookat
@@ -64,18 +67,13 @@ vec3 colors[] =
 };
 
 
-// vertex array object
-unsigned int vertexArrayObjID;
-
-// vertex buffer objects
-unsigned int vertexBufferObjID;
-
 // Programs
 GLuint program;
 
 // Prototypes
 void handleInputs();
 void drawWorld();
+void drawSpaceship();
 void loadModels();
 void initTextures();
 
@@ -131,20 +129,7 @@ void initTextures(){
 	// todo add textures here. 
 }
 
-// Todo fix using other code
-void drawWorld(){
-	glUseProgram(program);
-	mat4 trans = T(0.0f, 0, 0.0f);
-	mat4 scale = S(500.0f, 0.5f, 500.0f);
-	mat4 rotation = Ry(0);
-	mat4 modification = trans * scale * rotation;
-	mat4 total = modification;
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
 
-
-	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
-
-}
 
 
 
@@ -229,3 +214,26 @@ int main(int argc, char *argv[])
 	glutMainLoop();
 	return 0;
 }
+
+
+
+
+// Draw functions
+
+
+// Todo fix using other code
+void drawWorld(){
+	glUseProgram(program);
+	mat4 trans = T(0.0f, 0, 0.0f);
+	mat4 scale = S(500.0f, 0.5f, 500.0f);
+	mat4 rotation = Ry(0);
+	mat4 modification = trans * scale * rotation;
+	mat4 total = modification;
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
+
+
+	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
+
+}
+
+void drawSpaceship(){}
