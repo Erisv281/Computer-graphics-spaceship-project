@@ -1,9 +1,20 @@
 #version 150
 
 in  vec3 in_Position;
+in vec3 in_Normal;
+
+// Matrices
+uniform mat4 projection;
+uniform mat4 model_view;	// this is model to world matrix. 
+uniform mat4 lookat;
+
+// Outs
+out vec3 exNormal;
+
 
 void main(void)
 {
-	gl_Position = vec4(in_Position, 1.0);
+	exNormal = mat3(lookat) * in_Normal;
+	gl_Position =  projection * lookat * model_view * vec4(in_Position, 1.0);
 }
 
