@@ -99,6 +99,7 @@
         "mixinvector": "cpp",
         "fast_back_stack": "cpp",
         "strstream": "cpp",
-        "csignal": "cpp"
+        "csignal": "cpp",
+        "light": "cpp"
     }
 }

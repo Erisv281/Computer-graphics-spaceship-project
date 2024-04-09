@@ -11,9 +11,14 @@
 #include "LoadTGA.h"
 #include <math.h>
 #include <iostream>
+#include <vector>
+#include <csignal>
+#include <chrono>	// For timers
 
 // My own includes
+// Todo add to makefile aswell
 #include "./GameData/Spaceship.h"
+#include "./GameData/Bullet.h"
 
 
 
@@ -30,14 +35,23 @@ GLfloat t;
 // Models
 Model* world;
 Model* spaceshipModel;
+Model* bulletModel;
 
 // GameData
 Spaceship spaceship;
+std::vector<Bullet*> bullets;
 
 // Constants
 const float GAME_SPEED = 0.25f;
 const float MOVE_SPEED = 2.0f;
 const float ROT_SPEED = 0.2f;
+
+const float BULLET_SPEED = 0.5f;
+
+// Shooting
+const double SHOOT_INTERVAL = 2.0;
+std::chrono::duration<double> shootingTime;
+std::chrono::steady_clock::time_point endTime;	// Todo something with this
 
 // Screen offset boundaries
 const std::pair<float, float> OFFSET_SCREEN_Z {-9.0f, 17.0f};
@@ -95,10 +109,12 @@ GLuint program;
 
 // Prototypes
 void handleInputs();
-void drawWorld();
-void drawSpaceship();
 void loadModels();
 void initTextures();
+
+void drawWorld();
+void drawSpaceship();
+void drawBullet(Bullet* b);
 
 // Todo fix later
 void handleInputs(){
@@ -142,9 +158,15 @@ void handleInputs(){
 		}
 	}
 
-	std::cout << "Anglex: " << rotAngleX << std::endl;
-	std::cout << "Anglez: " << rotAngleZ << std::endl;
-
+	
+	// If Pressing space and can shoot
+	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
+		// Spawn bullet as my position
+		std::cout << "Shoot!";
+		spaceship.shoot();
+		// Todo start cooldown timer. 
+		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getPosition()));
+	}
 
 
 
@@ -161,6 +183,7 @@ void loadModels(){
 	world = LoadDataToModel(vertices, vertex_normals, tex_coords, colors, indices, 4, 6);	// Or 4*3
 
 	spaceshipModel = LoadModel("../Models/teapot.obj");
+	bulletModel = LoadModel("../Models/groundsphere.obj");
 
 	
 	// Todo add more models here
@@ -213,7 +236,7 @@ void init(void)
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f));
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f), SHOOT_INTERVAL);
 
 
 	
@@ -240,10 +263,17 @@ void display(void)
 
 	// Todo bind textures here. 
 
-	// Draw world
+	// Draw the furthest objects first
 	drawWorld();
 
-	// Detect collistion and draw functions here
+	
+
+	// Detect bullet collisions
+	for (Bullet* b : bullets){
+		drawBullet(b);
+		// Todo check world-bullet collision?
+	}
+
 	drawSpaceship();
 
 	// Post display
@@ -251,8 +281,21 @@ void display(void)
 	glutSwapBuffers();
 }
 
+// Freeing memory when exiting the window. 
+void signalHandler(int signum){
+	std::cout << "here free data\n";
+	for (Bullet* b : bullets){
+		delete b;
+	}
+	bullets.clear();	// Pointer invalidation clear
+	exit(signum);
+}
+
+
 int main(int argc, char *argv[])
 {
+	signal(SIGINT, signalHandler);	// Free dynamic memory
+
 	glutInit(&argc, argv);
 	glutInitContextVersion(3, 2);
 
@@ -300,7 +343,9 @@ void drawSpaceship(){
 	spaceship.setRotAngleX(rotAngleX);
 	spaceship.setRotAngleZ(rotAngleZ);
 
-	// Set Model-view
+	// Todo check timer heer. 
+
+	// Set Model-view matrix
 	vec3 pos = spaceship.getPosition();
 	mat4 modification = T(pos.x, pos.y, pos.z);
 	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
@@ -310,5 +355,17 @@ void drawSpaceship(){
 	// Draw
 	DrawModel(spaceship.getModel(), program, "in_Position", "in_Normal", "inTexCoord");
 
+}
 
+void drawBullet(Bullet* bullet){
+	// Move
+	bullet->move(vec3{BULLET_SPEED,0,0});
+
+	// Set model-view matrix
+	vec3 pos = bullet->getPosition();
+	mat4 modification = T(pos.x, pos.y, pos.z);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
+
+	// Draw
+	DrawModel(bullet->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
 }

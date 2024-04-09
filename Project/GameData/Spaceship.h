@@ -3,20 +3,12 @@
 #ifndef _SPACESHIP
 #define _SPACESHIP
 
-#include "GL_utilities.h"
-#include "MicroGlut.h"
-#include "LittleOBJLoader.h"
-#include "VectorUtils4.h"
-#include "LoadTGA.h"
-#include <iostream>
+#include "Entity.h"
 
-class Spaceship{
+class Spaceship : public Entity{
 private:
-    Model* model;
-    int health{0};
-    float speed{0.0};
-    vec3 position{0, 0, 0};
-    bool canShoot{true};
+    // Shooting 
+    bool isShooting{false};
 
     // Rotation
     float rotAngleX{0.0f};
@@ -25,37 +17,33 @@ private:
 public:
     // Constructors
     Spaceship();
-    Spaceship(Model* model, int health, float speed, vec3 position);
-
-    // Destructor
-    ~Spaceship();
+    Spaceship(Model* model, int health, float speed, vec3 position, double seconds);
 
     // Copy and assign constructors
     Spaceship(const Spaceship& other);
     Spaceship& operator=(const Spaceship& other);
 
-    // Getters & setters
-    // Reduce health
-    void takeDamage(int damage);
+    // Inline Getters
+    inline float getRotAngleX() const { return this->rotAngleX; }
+    inline float getRotAngleZ() const { return this->rotAngleZ; }
+    inline bool getIsShooting() const { return this->isShooting; }
 
-    Model* getModel();
-    vec3 getPosition();
-    float getSpeed();
-
+    // Setters
     void setRotAngleX(float angle);
     void setRotAngleZ(float angle);
-    float getRotAngleX();
-    float getRotAngleZ();
+    void setIsShooting(bool isShooting);
+        
 
     // Collision detection
     void collisionEnemies();
     void collisionSurface();
 
-    // Move to new position. Todo fix later
-    void move(vec3 pos);
+    // Move to new position.
+    void move(vec3 pos) override;
 
-    // Shoot bullet
+    // Start timer for shooting. 
     void shoot();
+
 
     
 
