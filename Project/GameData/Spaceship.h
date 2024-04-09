@@ -18,6 +18,10 @@ private:
     vec3 position{0, 0, 0};
     bool canShoot{true};
 
+    // Rotation
+    float rotAngleX{0.0f};
+    float rotAngleZ{0.0f};
+
 public:
     // Constructors
     Spaceship();
@@ -36,6 +40,12 @@ public:
 
     Model* getModel();
     vec3 getPosition();
+    float getSpeed();
+
+    void setRotAngleX(float angle);
+    void setRotAngleZ(float angle);
+    float getRotAngleX();
+    float getRotAngleZ();
 
     // Collision detection
     void collisionEnemies();

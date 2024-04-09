@@ -68,3 +68,20 @@ Model* Spaceship::getModel(){
 vec3 Spaceship::getPosition(){
     return this->position;
 }
+
+ float Spaceship::getSpeed(){
+    return this->speed;
+ }
+
+void Spaceship::setRotAngleX(float angle){
+    this->rotAngleX = angle;
+}
+void Spaceship::setRotAngleZ(float angle){
+    this->rotAngleZ = angle;
+}
+float Spaceship::getRotAngleX(){
+    return rotAngleX;
+}
+float Spaceship::getRotAngleZ(){
+    return rotAngleZ;
+}

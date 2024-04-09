@@ -23,6 +23,8 @@ vec3 cameraPoint;
 vec3 lookatPoint;
 mat4 look, modelView, projectionMatrix;
 
+// Timer
+GLfloat t;
 
 
 // Models
@@ -34,9 +36,20 @@ Spaceship spaceship;
 
 // Constants
 const float GAME_SPEED = 0.25f;
+const float MOVE_SPEED = 2.0f;
+const float ROT_SPEED = 0.2f;
+
+// Screen offset boundaries
+const std::pair<float, float> OFFSET_SCREEN_Z {-9.0f, 17.0f};
+const std::pair<float, float> OFFSET_SCREEN_Y {-6.0f, 20.0f};
+
+const std::pair<float, float> OFFSET_ROT_X {-1.0f, 1.0f};
+const std::pair<float, float> OFFSET_ROT_Z {-0.5f, 0.5f};
 
 // Misc. 
 vec3 nextPosition{0,0,0};
+float rotAngleX{0.0f};
+float rotAngleZ{0.0f};
 
 
 // World
@@ -89,53 +102,57 @@ void initTextures();
 
 // Todo fix later
 void handleInputs(){
-	// WS = Move camerapoint
-	// ADQE = Move lookat and camerapoint
-	// RF Move up and down. 
+	// WS = Move up and down
+	// AD = Move left and right
 
-	nextPosition = vec3{0,0,0};
+	// Next position of spaceship. 
+	nextPosition = vec3{GAME_SPEED,0,0};
+	float moveSpeed = spaceship.getSpeed();
+	vec3 spaceshipPos = spaceship.getPosition();
+	rotAngleX = spaceship.getRotAngleX();
+	rotAngleZ = spaceship.getRotAngleZ();
 
-	// Found in collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
-	if (glutKeyIsDown('w')){
-		cameraPoint += lookatPoint * GAME_SPEED;
-		nextPosition += lookatPoint * GAME_SPEED;
-	}
+	if (glutKeyIsDown('w') && spaceshipPos.y < OFFSET_SCREEN_Y.second){
+		nextPosition.y += moveSpeed;
+
+		if (rotAngleZ < OFFSET_ROT_Z.second){
+			rotAngleZ += ROT_SPEED;
+		}
 		
-
-	if (glutKeyIsDown('a'))
-		lookatPoint = MultVec3(Ry(0.03), lookatPoint);
-
-	if (glutKeyIsDown('d'))
-		lookatPoint = MultVec3(Ry(-0.03), lookatPoint);
-
-	if (glutKeyIsDown('s')){
-		cameraPoint -= lookatPoint * GAME_SPEED;
-		nextPosition -= lookatPoint * GAME_SPEED;
 	}
+	if (glutKeyIsDown('s') && spaceshipPos.y > OFFSET_SCREEN_Y.first){
+		nextPosition.y -= moveSpeed;
+
+		if (rotAngleZ > OFFSET_ROT_Z.first){
+			rotAngleZ -= ROT_SPEED;
+		}
+	}
+	if (glutKeyIsDown('a') && spaceshipPos.z > OFFSET_SCREEN_Z.first){
+		nextPosition.z -= moveSpeed;
+
+		if (rotAngleX > OFFSET_ROT_X.first){
+			rotAngleX -= ROT_SPEED;
+		}
 		
-
-	if (glutKeyIsDown('q'))
-		cameraPoint += MultVec3(Ry(M_PI/2), lookatPoint) * GAME_SPEED;
-
-	if (glutKeyIsDown('e'))
-		cameraPoint += MultVec3(Ry(-M_PI/2), lookatPoint) * GAME_SPEED;
-
-	if (glutKeyIsDown('r')){
-		cameraPoint.y += 0.1;
-		nextPosition.y += 0.1;
 	}
-		
-
-	if (glutKeyIsDown('f')){
-		cameraPoint.y -= 0.1;
-		nextPosition.y -= 0.1;
+	if (glutKeyIsDown('d') && spaceshipPos.z < OFFSET_SCREEN_Z.second){
+		nextPosition.z += moveSpeed;
+		if (rotAngleX < OFFSET_ROT_X.second){
+			rotAngleX += ROT_SPEED;
+		}
 	}
-	
+
+	std::cout << "Anglex: " << rotAngleX << std::endl;
+	std::cout << "Anglez: " << rotAngleZ << std::endl;
+
+
+
 
 	// send camera position to shader, camera pos already in world cooridnates. 
 	//glUniform3f(glGetUniformLocation(program, well within the lab tim"camera_pos"), cameraPoint.x, cameraPoint.y, cameraPoint.z);
 
 	// Lookat here
+	cameraPoint.x += GAME_SPEED;	// Game increase x-axis
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 	glUniformMatrix4fv(glGetUniformLocation(program, "lookat"), 1, GL_TRUE, look.m);
 }
@@ -159,9 +176,13 @@ void initTextures(){
 
 // Init stuff
 void GLInits(){
-    dumpInfo();
-
+    //dumpInfo();
 	glClearColor(0.2,0.2,0.5,0);
+
+	// Enable Z-buffer and culling
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+
 	printError("GL inits");
 }
 
@@ -184,7 +205,7 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(-22.3, 10.4, 1.42);
+	cameraPoint = vec3(-30.3, 10.4, 1.42);
 	lookatPoint = vec3(2.82, 0, 0.19);
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
@@ -192,7 +213,7 @@ void init(void)
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, GAME_SPEED, vec3(5.0f, 0.0f, 3.0f));
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f));
 
 
 	
@@ -203,9 +224,13 @@ void init(void)
 
 void display(void)
 {
+	
 	// Predisplay
 	printError("pre display");
 	glClear(GL_COLOR_BUFFER_BIT);	// clear the screen
+
+	// Continous rotation
+	t = (GLfloat)glutGet(GLUT_ELAPSED_TIME);
 
 	// Input handler
 	handleInputs();
@@ -213,9 +238,12 @@ void display(void)
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
+	// Todo bind textures here. 
 
-	// Draw function calls
+	// Draw world
 	drawWorld();
+
+	// Detect collistion and draw functions here
 	drawSpaceship();
 
 	// Post display
@@ -228,7 +256,8 @@ int main(int argc, char *argv[])
 	glutInit(&argc, argv);
 	glutInitContextVersion(3, 2);
 
-	// Todo enable glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);	// Call before creating context
+	//glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);
+	//glutInitContextVersion(3, 2);
 
 	glutInitWindowSize(600, 600);
 	glutCreateWindow ("Project");
@@ -266,13 +295,16 @@ void drawWorld(){
 void drawSpaceship(){
 	glUseProgram(program);
 
-	// Move
+	// Move and rotate
 	spaceship.move(nextPosition);
+	spaceship.setRotAngleX(rotAngleX);
+	spaceship.setRotAngleZ(rotAngleZ);
 
 	// Set Model-view
 	vec3 pos = spaceship.getPosition();
 	mat4 modification = T(pos.x, pos.y, pos.z);
-	mat4 total = modification;
+	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
+	mat4 total = modification * rotation;
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
 
 	// Draw
