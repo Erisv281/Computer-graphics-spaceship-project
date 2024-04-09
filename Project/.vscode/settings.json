@@ -97,6 +97,8 @@
         "boundingsphere": "cpp",
         "shape": "cpp",
         "mixinvector": "cpp",
-        "fast_back_stack": "cpp"
+        "fast_back_stack": "cpp",
+        "strstream": "cpp",
+        "csignal": "cpp"
     }
 }

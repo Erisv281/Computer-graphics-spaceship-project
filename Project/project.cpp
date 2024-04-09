@@ -27,6 +27,16 @@ mat4 look, modelView, projectionMatrix;
 
 // Models
 Model* world;
+Model* spaceshipModel;
+
+// GameData
+Spaceship spaceship;
+
+// Constants
+const float GAME_SPEED = 0.25f;
+
+// Misc. 
+vec3 nextPosition{0,0,0};
 
 
 // World
@@ -82,11 +92,15 @@ void handleInputs(){
 	// WS = Move camerapoint
 	// ADQE = Move lookat and camerapoint
 	// RF Move up and down. 
-	float cameraSpeed = 0.25f;
 
-	// Found in collision2-surfaces-multiobj-little-city.c by Ingemar
-	if (glutKeyIsDown('w'))
-		cameraPoint += lookatPoint * cameraSpeed;
+	nextPosition = vec3{0,0,0};
+
+	// Found in collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
+	if (glutKeyIsDown('w')){
+		cameraPoint += lookatPoint * GAME_SPEED;
+		nextPosition += lookatPoint * GAME_SPEED;
+	}
+		
 
 	if (glutKeyIsDown('a'))
 		lookatPoint = MultVec3(Ry(0.03), lookatPoint);
@@ -94,20 +108,27 @@ void handleInputs(){
 	if (glutKeyIsDown('d'))
 		lookatPoint = MultVec3(Ry(-0.03), lookatPoint);
 
-	if (glutKeyIsDown('s'))
-		cameraPoint -= lookatPoint * cameraSpeed;
+	if (glutKeyIsDown('s')){
+		cameraPoint -= lookatPoint * GAME_SPEED;
+		nextPosition -= lookatPoint * GAME_SPEED;
+	}
+		
 
 	if (glutKeyIsDown('q'))
-		cameraPoint += MultVec3(Ry(M_PI/2), lookatPoint) * cameraSpeed;
+		cameraPoint += MultVec3(Ry(M_PI/2), lookatPoint) * GAME_SPEED;
 
 	if (glutKeyIsDown('e'))
-		cameraPoint += MultVec3(Ry(-M_PI/2), lookatPoint) * cameraSpeed;
+		cameraPoint += MultVec3(Ry(-M_PI/2), lookatPoint) * GAME_SPEED;
 
-	if (glutKeyIsDown('r'))
+	if (glutKeyIsDown('r')){
 		cameraPoint.y += 0.1;
+		nextPosition.y += 0.1;
+	}
+		
 
 	if (glutKeyIsDown('f')){
 		cameraPoint.y -= 0.1;
+		nextPosition.y -= 0.1;
 	}
 	
 
@@ -122,6 +143,9 @@ void handleInputs(){
 void loadModels(){
 	world = LoadDataToModel(vertices, vertex_normals, tex_coords, colors, indices, 4, 6);	// Or 4*3
 
+	spaceshipModel = LoadModel("../Models/teapot.obj");
+
+	
 	// Todo add more models here
 }
 
@@ -160,14 +184,15 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(-5.9, 2.6, 0.25);
-	lookatPoint = vec3(2.46, 0, 1.4);
-	vec3 newPoint = cameraPoint + lookatPoint;
-	look = lookAtv(cameraPoint, newPoint, vec3(0, 1, 0));
+	cameraPoint = vec3(-22.3, 10.4, 1.42);
+	lookatPoint = vec3(2.82, 0, 0.19);
+	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
 	// Model-view
 	modelView = IdentityMatrix();
 
+	// Spaceship
+	spaceship = Spaceship(spaceshipModel, 100, GAME_SPEED, vec3(5.0f, 0.0f, 3.0f));
 
 
 	
@@ -189,8 +214,10 @@ void display(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 
+	// Draw function calls
 	drawWorld();
-	
+	drawSpaceship();
+
 	// Post display
 	printError("display");
 	glutSwapBuffers();
@@ -236,4 +263,20 @@ void drawWorld(){
 
 }
 
-void drawSpaceship(){}
+void drawSpaceship(){
+	glUseProgram(program);
+
+	// Move
+	spaceship.move(nextPosition);
+
+	// Set Model-view
+	vec3 pos = spaceship.getPosition();
+	mat4 modification = T(pos.x, pos.y, pos.z);
+	mat4 total = modification;
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
+
+	// Draw
+	DrawModel(spaceship.getModel(), program, "in_Position", "in_Normal", "inTexCoord");
+
+
+}
