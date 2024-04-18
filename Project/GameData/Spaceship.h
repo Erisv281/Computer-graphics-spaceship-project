@@ -4,11 +4,15 @@
 #define _SPACESHIP
 
 #include "Entity.h"
+#include <chrono>
 
 class Spaceship : public Entity{
 private:
     // Shooting 
     bool isShooting{false};
+    // Code inspired by https://www.geeksforgeeks.org/chrono-in-c/
+    std::chrono::time_point<std::chrono::system_clock> shootTime;
+
 
     // Rotation
     float rotAngleX{0.0f};
@@ -17,7 +21,7 @@ private:
 public:
     // Constructors
     Spaceship();
-    Spaceship(Model* model, int health, float speed, vec3 position, double seconds);
+    Spaceship(Model* model, int health, float speed, vec3 position);
 
     // Copy and assign constructors
     Spaceship(const Spaceship& other);
@@ -43,6 +47,9 @@ public:
 
     // Start timer for shooting. 
     void shoot();
+
+    // Check if cooldown has passed. 
+    bool isShootCooldownWlapsed(double cooldown) const;
 
 
     

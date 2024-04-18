@@ -9,11 +9,10 @@
 #include "LittleOBJLoader.h"
 #include "VectorUtils4.h"
 #include "LoadTGA.h"
-#include <math.h>
+#include <cmath>
 #include <iostream>
 #include <vector>
 #include <csignal>
-#include <chrono>	// For timers
 
 // My own includes
 // Todo add to makefile aswell
@@ -49,9 +48,7 @@ const float ROT_SPEED = 0.2f;
 const float BULLET_SPEED = 0.5f;
 
 // Shooting
-const double SHOOT_INTERVAL = 2.0;
-std::chrono::duration<double> shootingTime;
-std::chrono::steady_clock::time_point endTime;	// Todo something with this
+const double SHOOTING_TIME = 2.0;
 
 // Screen offset boundaries
 const std::pair<float, float> OFFSET_SCREEN_Z {-9.0f, 17.0f};
@@ -67,6 +64,7 @@ float rotAngleZ{0.0f};
 
 
 // World
+const double X_FAR = 16.0;
 #define kGroundSize 100.0f
 vec3 vertices[] =
 {
@@ -111,6 +109,8 @@ GLuint program;
 void handleInputs();
 void loadModels();
 void initTextures();
+
+bool isOutsideFrustum(vec3 const otherPos);
 
 void drawWorld();
 void drawSpaceship();
@@ -162,9 +162,7 @@ void handleInputs(){
 	// If Pressing space and can shoot
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
 		// Spawn bullet as my position
-		std::cout << "Shoot!";
 		spaceship.shoot();
-		// Todo start cooldown timer. 
 		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getPosition()));
 	}
 
@@ -236,7 +234,7 @@ void init(void)
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f), SHOOT_INTERVAL);
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f));
 
 
 	
@@ -266,10 +264,26 @@ void display(void)
 	// Draw the furthest objects first
 	drawWorld();
 
-	
+
+	// Bullet free check. 
+	// Using a seperate loop to avoid pointer/iterator invalidation. 
+	for (auto it = bullets.begin(); it != bullets.end();) {
+		 Bullet* bullet = *it;
+		if (isOutsideFrustum(bullet->getPosition())){
+			std::cout << "FREE!!";
+			delete bullet;
+			it = bullets.erase(it);
+		}
+		else{
+			it++;
+		}
+	}
+
 
 	// Detect bullet collisions
 	for (Bullet* b : bullets){
+		// Check if should delete
+
 		drawBullet(b);
 		// Todo check world-bullet collision?
 	}
@@ -283,8 +297,8 @@ void display(void)
 
 // Freeing memory when exiting the window. 
 void signalHandler(int signum){
-	std::cout << "here free data\n";
 	for (Bullet* b : bullets){
+		std::cout << "here free data\n";
 		delete b;
 	}
 	bullets.clear();	// Pointer invalidation clear
@@ -315,6 +329,13 @@ int main(int argc, char *argv[])
 }
 
 
+// Frustum far plane
+bool isOutsideFrustum(vec3 const otherPos){
+	//std::cout << abs(spaceship.getPosition().x - otherPos.x) << std::endl;
+	return abs(spaceship.getPosition().x - otherPos.x) > X_FAR;
+}
+
+
 
 
 // Draw functions
@@ -338,12 +359,15 @@ void drawWorld(){
 void drawSpaceship(){
 	glUseProgram(program);
 
+	// If spaceship is shooting and time has elapsed, then allow shooting again. 
+	if (spaceship.getIsShooting() && spaceship.isShootCooldownWlapsed(SHOOTING_TIME)){
+		spaceship.setIsShooting(false);
+	}
+
 	// Move and rotate
 	spaceship.move(nextPosition);
 	spaceship.setRotAngleX(rotAngleX);
 	spaceship.setRotAngleZ(rotAngleZ);
-
-	// Todo check timer heer. 
 
 	// Set Model-view matrix
 	vec3 pos = spaceship.getPosition();

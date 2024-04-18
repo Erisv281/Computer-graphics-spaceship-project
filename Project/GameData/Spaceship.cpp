@@ -4,7 +4,7 @@
 
 // Constructors
 Spaceship::Spaceship() : Entity(), isShooting{false} {}
-Spaceship::Spaceship(Model* model, int health, float speed, vec3 position, double seconds) : Entity(model, health, speed, position), 
+Spaceship::Spaceship(Model* model, int health, float speed, vec3 position) : Entity(model, health, speed, position), 
                     isShooting{false} {}
 
 
@@ -48,5 +48,12 @@ void Spaceship::setIsShooting(bool isShooting){
 // Shoot bullet
 void Spaceship::shoot(){
     this->isShooting = true;
+    this->shootTime = std::chrono::system_clock::now();
+}
+
+bool Spaceship::isShootCooldownWlapsed(double cooldown) const{
+    auto currentTime = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration<double>(currentTime - shootTime).count();
+    return elapsed >= cooldown;
 
 }
