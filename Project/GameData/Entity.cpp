@@ -6,11 +6,11 @@
 
 
 // Constructors
-Entity::Entity() : model{nullptr}, health{0}, speed{0.0}, position{vec3(0,0,0)} {}
-Entity::Entity(Model* model, int health, float speed, vec3 position) : model{new Model{*model}},
+Entity::Entity() : model{nullptr}, health{0}, speed{0.0}, position{vec3(0,0,0)}, damage{0} {}
+Entity::Entity(Model* model, int health, float speed, vec3 position, int damage) : model{new Model{*model}},
                                                                     health{health},
                                                                     speed{speed},
-                                                                    position{position} {}
+                                                                    position{position}, damage{damage} {}
 
 // Destructor
 Entity::~Entity(){
@@ -25,6 +25,7 @@ Entity::Entity(const Entity& other){
     this->health = other.health;
     this->speed = other.speed;
     this->position = other.position;
+    this->damage = other.damage;
 }
 
 // copy assign operator
@@ -38,6 +39,7 @@ Entity& Entity::operator=(const Entity& other){
     std::swap(this->health, temp.health);
     std::swap(this->speed, temp.speed);
     std::swap(this->position, temp.position);
+    std::swap(this->damage, temp.damage);
 
     return *this;
 }
@@ -58,6 +60,10 @@ void Entity::setSpeed(float speed){
 }
 void Entity::setIsDead(bool isDead){
     this->isDead = isDead;
+}
+
+void Entity::setDamage(int damage){
+    this->damage = damage;
 }
 
 

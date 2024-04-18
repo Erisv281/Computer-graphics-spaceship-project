@@ -3,7 +3,7 @@
 
 // Constructors
 Bullet::Bullet() : Entity() {}
-Bullet::Bullet(Model* model, int health, float speed, vec3 position) : Entity(model, health, speed, position) {}
+Bullet::Bullet(Model* model, int health, float speed, vec3 position, int damage) : Entity(model, health, speed, position, damage) {}
 
 // Collision detection
 void Bullet::collisionEnemies(){

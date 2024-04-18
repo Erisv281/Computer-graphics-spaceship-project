@@ -10,7 +10,7 @@ class Bullet : public Entity{
 public:
     // Constructors
     Bullet();
-    Bullet(Model* model, int health, float speed, vec3 position);
+    Bullet(Model* model, int health, float speed, vec3 position, int damage);
 
     // Collision detection
     void collisionEnemies();

@@ -10,14 +10,17 @@
 #include "VectorUtils4.h"
 #include "LoadTGA.h"
 #include <cmath>
+#include <cstdlib> // For random
 #include <iostream>
 #include <vector>
+#include <chrono>
 #include <csignal>
 
 // My own includes
 // Todo add to makefile aswell
 #include "./GameData/Spaceship.h"
 #include "./GameData/Bullet.h"
+#include "./GameData/Enemy.h"
 
 
 
@@ -35,24 +38,35 @@ GLfloat t;
 Model* world;
 Model* spaceshipModel;
 Model* bulletModel;
+Model* enemyModel;
 
 // GameData
 Spaceship spaceship;
 std::vector<Bullet*> bullets;
+std::vector<Enemy*> enemies;
 
 // Constants
 const float GAME_SPEED = 0.25f;
 const float MOVE_SPEED = 2.0f;
 const float ROT_SPEED = 0.2f;
-
 const float BULLET_SPEED = 0.5f;
 
 // Shooting
 const double SHOOTING_TIME = 2.0;
+const int BULLET_DAMAGE = 1;
+
+// For enemies
+const std::pair<int, int> SPAWNER_COOLDOWN {2, 7};
+const int ENEMY_HEALTH = 1;
+const int ENEMY_DAMAGE = 1;
+const int ENEMY_SPEED = 1.0f;
+std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
+float enemySpawnCooldown = 2.0f;
+
 
 // Screen offset boundaries
-const std::pair<float, float> OFFSET_SCREEN_Z {-9.0f, 17.0f};
-const std::pair<float, float> OFFSET_SCREEN_Y {-6.0f, 20.0f};
+const std::pair<int, int> OFFSET_SCREEN_Z {-9, 17};
+const std::pair<int, int> OFFSET_SCREEN_Y {-6, 20};
 
 const std::pair<float, float> OFFSET_ROT_X {-1.0f, 1.0f};
 const std::pair<float, float> OFFSET_ROT_Z {-0.5f, 0.5f};
@@ -111,10 +125,16 @@ void loadModels();
 void initTextures();
 
 bool isOutsideFrustum(vec3 const otherPos);
+bool isOutsideFrustumNear(vec3 const otherPos);
+
+
+void enemySpawner();
+void spawnEnemy();
 
 void drawWorld();
 void drawSpaceship();
 void drawBullet(Bullet* b);
+void drawEnemy(Enemy* e);
 
 // Todo fix later
 void handleInputs(){
@@ -163,7 +183,7 @@ void handleInputs(){
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
 		// Spawn bullet as my position
 		spaceship.shoot();
-		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getPosition()));
+		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getPosition(), BULLET_DAMAGE));
 	}
 
 
@@ -182,6 +202,7 @@ void loadModels(){
 
 	spaceshipModel = LoadModel("../Models/teapot.obj");
 	bulletModel = LoadModel("../Models/groundsphere.obj");
+	enemyModel = LoadModel("../Models/teddy.obj");
 
 	
 	// Todo add more models here
@@ -190,8 +211,6 @@ void loadModels(){
 void initTextures(){
 	// todo add textures here. 
 }
-
-
 
 
 
@@ -234,7 +253,11 @@ void init(void)
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f));
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f), 0);
+
+	// Enemies
+	enemySpawnTime = std::chrono::system_clock::now();
+	srand(time(nullptr));	// Random number generator
 
 
 	
@@ -261,8 +284,30 @@ void display(void)
 
 	// Todo bind textures here. 
 
+	// Enemy spawner handler
+	enemySpawner();
+
 	// Draw the furthest objects first
 	drawWorld();
+
+	// Draw enemies
+	// Using a seperate loop to avoid pointer/iterator invalidation. 
+	for (auto it = enemies.begin(); it != enemies.end();) {
+		 Enemy* e = *it;
+		if (isOutsideFrustumNear(e->getPosition())){
+			std::cout << "FREE!!";
+			delete e;
+			it = enemies.erase(it);
+		}
+		else{
+			it++;
+		}
+	}
+
+	// Detect enemy collisions
+	for (Enemy* e : enemies){
+		drawEnemy(e);
+	}
 
 
 	// Bullet free check. 
@@ -282,8 +327,6 @@ void display(void)
 
 	// Detect bullet collisions
 	for (Bullet* b : bullets){
-		// Check if should delete
-
 		drawBullet(b);
 		// Todo check world-bullet collision?
 	}
@@ -298,10 +341,14 @@ void display(void)
 // Freeing memory when exiting the window. 
 void signalHandler(int signum){
 	for (Bullet* b : bullets){
-		std::cout << "here free data\n";
 		delete b;
 	}
 	bullets.clear();	// Pointer invalidation clear
+
+	for (Enemy* e : enemies){
+		delete e;
+	}
+	enemies.clear();
 	exit(signum);
 }
 
@@ -331,11 +378,44 @@ int main(int argc, char *argv[])
 
 // Frustum far plane
 bool isOutsideFrustum(vec3 const otherPos){
-	//std::cout << abs(spaceship.getPosition().x - otherPos.x) << std::endl;
 	return abs(spaceship.getPosition().x - otherPos.x) > X_FAR;
+}
+// Near plane
+bool isOutsideFrustumNear(vec3 const otherPos){
+	return otherPos.x - spaceship.getPosition().x < -37.0f;	// Todo weird constant
 }
 
 
+// Enemy spawn:
+void enemySpawner(){
+	auto now = std::chrono::system_clock::now();
+	auto elapsed = std::chrono::duration<double>(now - enemySpawnTime).count();
+	if (elapsed >= enemySpawnCooldown){
+		// Spawn new Enemy and push back to vector. 
+		spawnEnemy();
+
+		// Reset cooldown and spawn time.
+		enemySpawnCooldown = rand() % SPAWNER_COOLDOWN.second + SPAWNER_COOLDOWN.first;
+		enemySpawnTime = std::chrono::system_clock::now();
+	}
+
+	
+}
+void spawnEnemy(){
+	// Set random position within y[1,2] and z[10, 11.8]
+	// Random decimals via y [10,20] then divided by 10. 
+	vec3 pos = spaceship.getPosition();
+	pos.x += X_FAR;
+	int randZ = rand() % 10 + 11;
+	int randY = rand() % 19 + 100;
+
+	std::cout << "y: " << randY/10.0f << ", z: " << randZ/10.0f << std::endl;
+
+	pos.y = randY / 10.0f;
+	pos.z = randZ / 10.0f;
+
+	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, 0.0f, pos, ENEMY_DAMAGE));
+}
 
 
 // Draw functions
@@ -392,4 +472,17 @@ void drawBullet(Bullet* bullet){
 
 	// Draw
 	DrawModel(bullet->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
+}
+
+void drawEnemy(Enemy* e){
+	// Move
+	e->move(vec3{-ENEMY_SPEED,0,0});	// Todo add lerping here (not moving x, moving yz)
+
+	// Set model-view matrix
+	vec3 pos = e->getPosition();
+	mat4 modification = T(pos.x, pos.y, pos.z);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
+
+	// Draw
+	DrawModel(e->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
 }

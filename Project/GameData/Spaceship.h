@@ -21,7 +21,7 @@ private:
 public:
     // Constructors
     Spaceship();
-    Spaceship(Model* model, int health, float speed, vec3 position);
+    Spaceship(Model* model, int health, float speed, vec3 position, int damage);
 
     // Copy and assign constructors
     Spaceship(const Spaceship& other);

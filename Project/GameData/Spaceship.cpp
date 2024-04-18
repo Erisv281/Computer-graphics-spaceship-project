@@ -4,7 +4,7 @@
 
 // Constructors
 Spaceship::Spaceship() : Entity(), isShooting{false} {}
-Spaceship::Spaceship(Model* model, int health, float speed, vec3 position) : Entity(model, health, speed, position), 
+Spaceship::Spaceship(Model* model, int health, float speed, vec3 position, int damage) : Entity(model, health, speed, position, damage), 
                     isShooting{false} {}
 
 
