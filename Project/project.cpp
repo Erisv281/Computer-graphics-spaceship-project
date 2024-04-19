@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdlib> // For random
 #include <iostream>
+#include <algorithm>
 #include <vector>
 #include <chrono>
 #include <csignal>
@@ -48,7 +49,6 @@ std::vector<Enemy*> enemies;
 // Constants
 const float GAME_SPEED = 0.25f;
 const float MOVE_SPEED = 2.0f;
-const float ROT_SPEED = 0.2f;
 const float BULLET_SPEED = 0.5f;
 
 // Shooting
@@ -68,13 +68,6 @@ float enemySpawnCooldown = 2.0f;
 const std::pair<int, int> OFFSET_SCREEN_Z {-9, 17};
 const std::pair<int, int> OFFSET_SCREEN_Y {-6, 20};
 
-const std::pair<float, float> OFFSET_ROT_X {-1.0f, 1.0f};
-const std::pair<float, float> OFFSET_ROT_Z {-0.5f, 0.5f};
-
-// Misc. 
-vec3 nextPosition{0,0,0};
-float rotAngleX{0.0f};
-float rotAngleZ{0.0f};
 
 
 // World
@@ -120,9 +113,14 @@ vec3 colors[] =
 GLuint program;
 
 // Prototypes
-void handleInputs();
 void loadModels();
 void initTextures();
+
+void handleInputs();
+void handleInputsAngles();
+void handleMovement(float& velocity, char moveKey, float acceleration);
+void handleAngle(float& angle, char angleKey, float acceleration);
+
 
 bool isOutsideFrustum(vec3 const otherPos);
 bool isOutsideFrustumNear(vec3 const otherPos);
@@ -136,47 +134,124 @@ void drawSpaceship();
 void drawBullet(Bullet* b);
 void drawEnemy(Enemy* e);
 
-// Todo fix later
-void handleInputs(){
-	// WS = Move up and down
-	// AD = Move left and right
+// Todo testing, rename!
+float velY = 0;
+float velZ = 0;
+float rotAngleX{0.0f};
+float rotAngleZ{0.0f};
+vec3 nextPosition{0,0,0};
 
-	// Next position of spaceship. 
-	nextPosition = vec3{GAME_SPEED,0,0};
-	float moveSpeed = spaceship.getSpeed();
+
+const float ACCELERATION_VERTICAL = 0.2f;
+const float ACCELERATION_HORIZONTAL = 0.1f;
+const float MAX_VELOCITY_HORIZONTAL = 3.0f;
+const float MAX_VELOCITY_VERTICAL = 3.0f;
+const float FRICTION_COEFFICIENT_ACC = 3.0f;
+const float FRICTION_COEFFICIENT_DEC = 0.5f;
+
+const float ANGULAR_ACCELERATION_X = 0.3f; 
+const float ANGULAR_ACCELERATION_Z = 0.15f;
+const float MAX_ROT_X = 1.0f; 	
+const float MAX_ROT_Z = 0.5f;	
+const float ANGULAR_FRICTION_ACC = 0.95;
+const float ANGULAR_FRICTION_DEC = 0.95;
+
+
+
+void handleAcceleration(float& movement, char moveKey, float acceleration, float friction){
+	if (glutKeyIsDown(moveKey)){
+		movement += acceleration * friction;
+	}
+}
+
+
+// If not pressing either key1 nor key2. Then apply deacceleration friction to the data. 
+void handleDeacceleration(float& movement, char key1, char key2, float friction){
+	if (!(glutKeyIsDown(key1) || glutKeyIsDown(key2))) {
+		movement *= friction;
+		if (fabs(movement) < 0.01f) {
+			movement = 0.0f;
+		}
+	}
+}
+
+void handleInputsAngles(){
 	vec3 spaceshipPos = spaceship.getPosition();
 	rotAngleX = spaceship.getRotAngleX();
 	rotAngleZ = spaceship.getRotAngleZ();
 
-	if (glutKeyIsDown('w') && spaceshipPos.y < OFFSET_SCREEN_Y.second){
-		nextPosition.y += moveSpeed;
+	// Handle rotations
+	if (spaceshipPos.y < OFFSET_SCREEN_Y.second){
+		handleAcceleration(rotAngleZ, 'w', ANGULAR_ACCELERATION_Z, ANGULAR_FRICTION_ACC);
+	}
+	if (spaceshipPos.y > OFFSET_SCREEN_Y.first){
+		handleAcceleration(rotAngleZ, 's', -ANGULAR_ACCELERATION_Z, ANGULAR_FRICTION_ACC);
+	}
+	if (spaceshipPos.z > OFFSET_SCREEN_Z.first){
+		handleAcceleration(rotAngleX, 'a', -ANGULAR_ACCELERATION_X, ANGULAR_FRICTION_ACC);
+	}
+	if (spaceshipPos.z < OFFSET_SCREEN_Z.second){
+		handleAcceleration(rotAngleX, 'd', ANGULAR_ACCELERATION_X, ANGULAR_FRICTION_ACC);
+	}
 
-		if (rotAngleZ < OFFSET_ROT_Z.second){
-			rotAngleZ += ROT_SPEED;
-		}
-		
-	}
-	if (glutKeyIsDown('s') && spaceshipPos.y > OFFSET_SCREEN_Y.first){
-		nextPosition.y -= moveSpeed;
+	// Angle friction deacceleration
+	handleDeacceleration(rotAngleX, 'a', 'd', ANGULAR_FRICTION_DEC);
+	handleDeacceleration(rotAngleZ, 'w', 's', ANGULAR_FRICTION_DEC);
 
-		if (rotAngleZ > OFFSET_ROT_Z.first){
-			rotAngleZ -= ROT_SPEED;
-		}
-	}
-	if (glutKeyIsDown('a') && spaceshipPos.z > OFFSET_SCREEN_Z.first){
-		nextPosition.z -= moveSpeed;
+	// Max Angle checks. 
+	rotAngleZ = rotAngleZ < -MAX_ROT_Z ? -MAX_ROT_Z : rotAngleZ;
+	rotAngleZ = rotAngleZ > MAX_ROT_Z ? MAX_ROT_Z : rotAngleZ;
 
-		if (rotAngleX > OFFSET_ROT_X.first){
-			rotAngleX -= ROT_SPEED;
-		}
-		
+	rotAngleX = rotAngleX < -MAX_ROT_X ? -MAX_ROT_X : rotAngleX;
+	rotAngleX = rotAngleX > MAX_ROT_X ? MAX_ROT_X : rotAngleX;
+	
+
+}
+
+// WS = Move up and down
+// AD = Move left and right
+void handleInputs(){
+	// Next position of spaceship. 
+	nextPosition = vec3{GAME_SPEED,0,0};
+	vec3 spaceshipPos = spaceship.getPosition();
+
+	// Move Up W
+	if (spaceshipPos.y < OFFSET_SCREEN_Y.second){
+		handleAcceleration(velY, 'w', ACCELERATION_VERTICAL, FRICTION_COEFFICIENT_ACC);
 	}
-	if (glutKeyIsDown('d') && spaceshipPos.z < OFFSET_SCREEN_Z.second){
-		nextPosition.z += moveSpeed;
-		if (rotAngleX < OFFSET_ROT_X.second){
-			rotAngleX += ROT_SPEED;
-		}
+	else{
+		if (!glutKeyIsDown('s')){velY = 0.0f;}
 	}
+
+
+	// Move Down S
+	if (spaceshipPos.y > OFFSET_SCREEN_Y.first){
+		handleAcceleration(velY, 's', -ACCELERATION_VERTICAL, FRICTION_COEFFICIENT_ACC);
+	}
+	else{
+		if (!glutKeyIsDown('w')){velY = 0.0f;}
+	}
+	
+
+	// Move Left A
+	if (spaceshipPos.z > OFFSET_SCREEN_Z.first){
+		handleAcceleration(velZ, 'a', -ACCELERATION_HORIZONTAL, FRICTION_COEFFICIENT_ACC);		
+	}
+	else{
+		if (!glutKeyIsDown('d')){velZ = 0.0f;}
+	}
+
+	// Move Right D
+	if (spaceshipPos.z < OFFSET_SCREEN_Z.second){
+		handleAcceleration(velZ, 'd', ACCELERATION_HORIZONTAL, FRICTION_COEFFICIENT_ACC);	
+	}
+	else{
+		if (!glutKeyIsDown('a')){velZ = 0.0f;}
+	}
+
+	// Handle friction deacceleration
+	handleDeacceleration(velZ, 'a', 'd', FRICTION_COEFFICIENT_DEC);
+	handleDeacceleration(velY, 'w', 's', FRICTION_COEFFICIENT_DEC);
 
 	
 	// If Pressing space and can shoot
@@ -186,10 +261,20 @@ void handleInputs(){
 		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getPosition(), BULLET_DAMAGE));
 	}
 
+	// Max velocity checks. 
+	velZ = velZ < -MAX_VELOCITY_HORIZONTAL ? -MAX_VELOCITY_HORIZONTAL : velZ;
+	velZ = velZ > MAX_VELOCITY_HORIZONTAL ? MAX_VELOCITY_HORIZONTAL : velZ;
 
+	velY = velY < -MAX_VELOCITY_VERTICAL ? -MAX_VELOCITY_VERTICAL : velY;
+	velY = velY > MAX_VELOCITY_VERTICAL ? MAX_VELOCITY_VERTICAL : velY;
+
+
+	// Here cameraPoint.z += velZ and y!
+	nextPosition.y += velY;
+	nextPosition.z += velZ;
 
 	// send camera position to shader, camera pos already in world cooridnates. 
-	//glUniform3f(glGetUniformLocation(program, well within the lab tim"camera_pos"), cameraPoint.x, cameraPoint.y, cameraPoint.z);
+	//glUniform3f(glGetUniformLocation(program, "camera_pos"), cameraPoint.x, cameraPoint.y, cameraPoint.z);
 
 	// Lookat here
 	cameraPoint.x += GAME_SPEED;	// Game increase x-axis
@@ -278,6 +363,7 @@ void display(void)
 
 	// Input handler
 	handleInputs();
+	handleInputsAngles();
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modelView.m);
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
