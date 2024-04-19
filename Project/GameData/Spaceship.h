@@ -51,6 +51,9 @@ public:
     // Check if cooldown has passed. 
     bool isShootCooldownWlapsed(double cooldown) const;
 
+    // Get the crosshair position
+    vec3 getCrosshairPosition();
+
 
     
 

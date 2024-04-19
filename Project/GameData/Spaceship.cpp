@@ -57,3 +57,10 @@ bool Spaceship::isShootCooldownWlapsed(double cooldown) const{
     return elapsed >= cooldown;
 
 }
+
+vec3 Spaceship::getCrosshairPosition(){
+    vec3 pos = this->position;
+    pos.x += 3.0f;
+	pos.y += 15.0f;
+    return pos;
+}

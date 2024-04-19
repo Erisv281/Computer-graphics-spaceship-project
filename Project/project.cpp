@@ -50,7 +50,7 @@ std::vector<Enemy*> enemies;
 // Constants
 const float GAME_SPEED = 0.25f;
 const float MOVE_SPEED = 2.0f;
-const float BULLET_SPEED = 0.5f;
+const float BULLET_SPEED = 4.0f;
 
 // Shooting
 const double SHOOTING_TIME = 2.0;
@@ -72,7 +72,11 @@ const std::pair<int, int> OFFSET_SCREEN_Y {-32, 42};
 
 
 // World
-const double X_FAR = 16.0;
+const double X_FAR = 32.0;
+const double SPAWN_DISTANCE = 16.0;
+mat4 spaceshipModelMatrix;
+
+
 #define kGroundSize 100.0f
 vec3 vertices[] =
 {
@@ -124,7 +128,7 @@ void handleAngle(float& angle, char angleKey, float acceleration);
 
 
 bool isOutsideFrustum(vec3 const otherPos);
-bool isOutsideFrustumNear(vec3 const otherPos);
+bool isOutsideFrustumNear(vec3 otherPos);
 
 
 void enemySpawner();
@@ -259,7 +263,7 @@ void handleInputs(){
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
 		// Spawn bullet as my position
 		spaceship.shoot();
-		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getPosition(), BULLET_DAMAGE));
+		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE));
 	}
 
 	// Max velocity checks. 
@@ -338,7 +342,7 @@ void init(void)
 	lookatPoint = vec3(2.82, 0, 0);		// 0.19
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
-	// Model-view
+	// Model-world matrix
 	modelView = IdentityMatrix();
 
 	// Spaceship
@@ -377,15 +381,11 @@ void display(void)
 	// Enemy spawner handler
 	enemySpawner();
 
-	// Draw the furthest objects first
-	drawWorld();
-
-	// Draw enemies
+	
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = enemies.begin(); it != enemies.end();) {
 		 Enemy* e = *it;
 		if (isOutsideFrustumNear(e->getPosition())){
-			std::cout << "FREE!!";
 			delete e;
 			it = enemies.erase(it);
 		}
@@ -393,19 +393,11 @@ void display(void)
 			it++;
 		}
 	}
-
-	// Detect enemy collisions
-	for (Enemy* e : enemies){
-		drawEnemy(e);
-	}
-
-
 	// Bullet free check. 
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = bullets.begin(); it != bullets.end();) {
 		 Bullet* bullet = *it;
 		if (isOutsideFrustum(bullet->getPosition())){
-			std::cout << "FREE!!";
 			delete bullet;
 			it = bullets.erase(it);
 		}
@@ -414,6 +406,13 @@ void display(void)
 		}
 	}
 
+	// Draw the furthest objects first
+	drawWorld();
+
+	// Draw enemies
+	for (Enemy* e : enemies){
+		drawEnemy(e);
+	}
 
 	// Detect bullet collisions
 	for (Bullet* b : bullets){
@@ -468,11 +467,13 @@ int main(int argc, char *argv[])
 
 // Frustum far plane
 bool isOutsideFrustum(vec3 const otherPos){
-	return abs(spaceship.getPosition().x - otherPos.x) > X_FAR;
+	return fabs(spaceship.getPosition().x - otherPos.x) > X_FAR;
 }
 // Near plane
-bool isOutsideFrustumNear(vec3 const otherPos){
-	return otherPos.x - spaceship.getPosition().x < -37.0f;	// Todo weird constant
+bool isOutsideFrustumNear(vec3 otherPos){ 
+	vec3 diff = otherPos - spaceship.getPosition();
+	std::cout << diff.x << std::endl;
+	return otherPos.x - spaceship.getPosition().x < -50.0f;	// Todo weird constant
 }
 
 
@@ -491,18 +492,19 @@ void enemySpawner(){
 
 	
 }
+
 void spawnEnemy(){
 	// Set random position within y[1,2] and z[10, 11.8]
 	// Random decimals via y [10,20] then divided by 10. 
 	vec3 pos = spaceship.getPosition();
-	pos.x += X_FAR;
+	pos.x += SPAWN_DISTANCE;
 	int randZ = rand() % 10 + 11;
 	int randY = rand() % 19 + 100;
 
-	std::cout << "y: " << randY/10.0f << ", z: " << randZ/10.0f << std::endl;
-
 	pos.y = randY / 10.0f;
 	pos.z = randZ / 10.0f;
+
+	std::cout << pos.x <<  ", " << spaceship.getPosition().x << std::endl;
 
 	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, 0.0f, pos, ENEMY_DAMAGE));
 }
@@ -518,9 +520,8 @@ void drawWorld(){
 	mat4 scale = S(500.0f, 0.5f, 500.0f);
 	mat4 rotation = Ry(0);
 	mat4 modification = trans * scale * rotation;
-	mat4 total = modification;
+	mat4 total = modelView * modification;
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
-
 
 	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
 
@@ -530,13 +531,11 @@ void drawSpaceship(){
 	glUseProgram(program);
 
 	// Draw crosshair first. 
-	vec3 posCross = spaceship.getPosition();
-	posCross.x += 3.0f;
-	posCross.y += 15.0f;
+	vec3 posCross = spaceship.getCrosshairPosition();
 	mat4 modification2 = T(posCross.x, posCross.y, posCross.z);
 	mat4 rotation2 = Rz(90.0f);
 	mat4 scaling2 = S(2.0, 2.0, 2.0);
-	mat4 total2 = modification2 * rotation2 * scaling2;
+	mat4 total2 = modelView * modification2 * rotation2 * scaling2;
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total2.m);
 	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
@@ -558,15 +557,11 @@ void drawSpaceship(){
 	mat4 modification = T(pos.x, pos.y, pos.z);
 	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
 	mat4 scaling = S(1.5, 1.5, 1.5);
-	mat4 total = modification * rotation * scaling;
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
+	spaceshipModelMatrix = modelView * modification * rotation * scaling;
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, spaceshipModelMatrix.m);
 
 	// Draw
 	DrawModel(spaceship.getModel(), program, "in_Position", "in_Normal", "inTexCoord");
-
-
-	std::cout << "Spacepo: " << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
-
 
 }
 
@@ -576,8 +571,8 @@ void drawBullet(Bullet* bullet){
 
 	// Set model-view matrix
 	vec3 pos = bullet->getPosition();
-	mat4 modification = T(pos.x, pos.y, pos.z);
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
+	mat4 total = modelView * T(pos.x, pos.y, pos.z) * S(2.0, 2.0, 2.0);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
 
 	// Draw
 	DrawModel(bullet->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
@@ -589,9 +584,10 @@ void drawEnemy(Enemy* e){
 
 	// Set model-view matrix
 	vec3 pos = e->getPosition();
-	mat4 modification = T(pos.x, pos.y, pos.z);
+	mat4 modification = modelView * T(pos.x - 50.0, pos.y, pos.z);	// Todo testing 50
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
 
 	// Draw
 	DrawModel(e->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
+
 }
