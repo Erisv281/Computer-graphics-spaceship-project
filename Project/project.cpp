@@ -40,6 +40,7 @@ Model* world;
 Model* spaceshipModel;
 Model* bulletModel;
 Model* enemyModel;
+Model* crosshairModel;
 
 // GameData
 Spaceship spaceship;
@@ -65,8 +66,8 @@ float enemySpawnCooldown = 2.0f;
 
 
 // Screen offset boundaries
-const std::pair<int, int> OFFSET_SCREEN_Z {-9, 17};
-const std::pair<int, int> OFFSET_SCREEN_Y {-6, 20};
+const std::pair<int, int> OFFSET_SCREEN_Z {-36, 36};
+const std::pair<int, int> OFFSET_SCREEN_Y {-32, 42};
 
 
 
@@ -289,6 +290,9 @@ void loadModels(){
 	bulletModel = LoadModel("../Models/groundsphere.obj");
 	enemyModel = LoadModel("../Models/teddy.obj");
 
+	// From https://www.cgtrader.com/items/92541/download-page
+	crosshairModel = LoadModel("../Models/crosshair.obj");
+
 	
 	// Todo add more models here
 }
@@ -325,20 +329,20 @@ void init(void)
     loadShaders();	
 
 	// Projection
-	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, 0.2, 50.0);
+	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, 0.1, 1000.0);	// far = 50.0, near = 0.2
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(-30.3, 10.4, 1.42);
-	lookatPoint = vec3(2.82, 0, 0.19);
+	cameraPoint = vec3(-40.3, 10.4, 0);	// x=-30.3, y, z=1.42
+	lookatPoint = vec3(2.82, 0, 0);		// 0.19
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
 	// Model-view
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 3.0f), 0);
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 0.0f), 0);
 
 	// Enemies
 	enemySpawnTime = std::chrono::system_clock::now();
@@ -525,6 +529,20 @@ void drawWorld(){
 void drawSpaceship(){
 	glUseProgram(program);
 
+	// Draw crosshair first. 
+	vec3 posCross = spaceship.getPosition();
+	posCross.x += 3.0f;
+	posCross.y += 15.0f;
+	mat4 modification2 = T(posCross.x, posCross.y, posCross.z);
+	mat4 rotation2 = Rz(90.0f);
+	mat4 scaling2 = S(2.0, 2.0, 2.0);
+	mat4 total2 = modification2 * rotation2 * scaling2;
+
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total2.m);
+	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
+
+
+	// Draw spaceship here
 	// If spaceship is shooting and time has elapsed, then allow shooting again. 
 	if (spaceship.getIsShooting() && spaceship.isShootCooldownWlapsed(SHOOTING_TIME)){
 		spaceship.setIsShooting(false);
@@ -539,11 +557,16 @@ void drawSpaceship(){
 	vec3 pos = spaceship.getPosition();
 	mat4 modification = T(pos.x, pos.y, pos.z);
 	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
-	mat4 total = modification * rotation;
+	mat4 scaling = S(1.5, 1.5, 1.5);
+	mat4 total = modification * rotation * scaling;
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
 
 	// Draw
 	DrawModel(spaceship.getModel(), program, "in_Position", "in_Normal", "inTexCoord");
+
+
+	std::cout << "Spacepo: " << pos.x << ", " << pos.y << ", " << pos.z << std::endl;
+
 
 }
 
