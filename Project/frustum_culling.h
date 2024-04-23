@@ -1,0 +1,40 @@
+
+
+#ifndef _FC
+#define _FC
+
+#include "GL_utilities.h"
+#include "MicroGlut.h"
+#include "LittleOBJLoader.h"
+#include "VectorUtils4.h"
+#include "LoadTGA.h"
+
+// This class is based on the current source (https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling)
+class FrustumCulling{
+private:
+    vec4 nearPlane;
+    vec4 farPlane;
+
+    
+
+public:
+    // Creating planes
+    FrustumCulling();
+    FrustumCulling(vec3 camPos, vec3 lookatPoint, float near, float far);
+    void updatePlanes(vec3 camPos, vec3 lookatPoint, float near, float far);
+
+    // Getters
+    inline vec4 getFarPlane() const { return farPlane; }
+    inline vec4 getNearPlane() const { return nearPlane; }
+
+
+    // Checker
+    bool IsInsidePlane(vec4 plane, vec3 center, float radius) const;
+
+    // Helpers
+    vec4 calculatePlane(vec3 a, vec3 b, vec3 p);
+
+
+};
+
+#endif

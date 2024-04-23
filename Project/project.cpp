@@ -22,6 +22,7 @@
 #include "./GameData/Spaceship.h"
 #include "./GameData/Bullet.h"
 #include "./GameData/Enemy.h"
+#include "frustum_culling.h"
 
 
 
@@ -33,6 +34,9 @@ mat4 look, modelView, projectionMatrix;
 
 // Timer
 GLfloat t;
+
+// Planes
+FrustumCulling frustumCulling;
 
 
 // Models
@@ -73,6 +77,8 @@ const std::pair<int, int> OFFSET_SCREEN_Y {-32, 42};
 
 // World
 const double X_FAR = 32.0;
+const double PROJECTION_FAR = 200.0;
+const double PROJECTION_NEAR = 0.1;
 const double SPAWN_DISTANCE = 16.0;
 mat4 spaceshipModelMatrix;
 
@@ -333,7 +339,7 @@ void init(void)
     loadShaders();	
 
 	// Projection
-	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, 0.1, 1000.0);	// far = 50.0, near = 0.2
+	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, PROJECTION_NEAR, PROJECTION_FAR);	// far = 50.0, near = 0.2
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
@@ -341,6 +347,9 @@ void init(void)
 	cameraPoint = vec3(-40.3, 10.4, 0);	// x=-30.3, y, z=1.42
 	lookatPoint = vec3(2.82, 0, 0);		// 0.19
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
+
+	// Frustum culling
+	frustumCulling = FrustumCulling(cameraPoint, lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
 	// Model-world matrix
 	modelView = IdentityMatrix();
@@ -376,6 +385,9 @@ void display(void)
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
+	// Frustum culling
+	frustumCulling.updatePlanes(cameraPoint, lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
+
 	// Todo bind textures here. 
 
 	// Enemy spawner handler
@@ -397,7 +409,9 @@ void display(void)
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = bullets.begin(); it != bullets.end();) {
 		 Bullet* bullet = *it;
-		if (isOutsideFrustum(bullet->getPosition())){
+		//if (isOutsideFrustum(bullet->getPosition())){
+			if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 0.2f)){
+			std::cout << "Bullet free!";
 			delete bullet;
 			it = bullets.erase(it);
 		}
