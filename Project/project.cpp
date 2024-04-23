@@ -79,7 +79,7 @@ const std::pair<int, int> OFFSET_SCREEN_Y {-32, 42};
 const double X_FAR = 32.0;
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
-const double SPAWN_DISTANCE = 16.0;
+const double SPAWN_DISTANCE = 40.0;
 mat4 spaceshipModelMatrix;
 
 
@@ -344,18 +344,18 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(-40.3, 10.4, 0);	// x=-30.3, y, z=1.42
+	cameraPoint = vec3(0, 10.4, 0);	// x=-30.3, y, z=1.42
 	lookatPoint = vec3(2.82, 0, 0);		// 0.19
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
 	// Frustum culling
-	frustumCulling = FrustumCulling(cameraPoint, lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
+	frustumCulling = FrustumCulling(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
 	// Model-world matrix
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(5.0f, 0.0f, 0.0f), 0);
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(40.0f, 0.0f, 0.0f), 0);
 
 	// Enemies
 	enemySpawnTime = std::chrono::system_clock::now();
@@ -386,18 +386,19 @@ void display(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Frustum culling
-	frustumCulling.updatePlanes(cameraPoint, lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
+	frustumCulling.updatePlanes(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
 	// Todo bind textures here. 
 
 	// Enemy spawner handler
-	enemySpawner();
+	//enemySpawner();
 
 	
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = enemies.begin(); it != enemies.end();) {
 		 Enemy* e = *it;
-		if (isOutsideFrustumNear(e->getPosition())){
+		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 40.0)){
+			std::cout << "Enemy free check!\n";
 			delete e;
 			it = enemies.erase(it);
 		}
@@ -408,9 +409,8 @@ void display(void)
 	// Bullet free check. 
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = bullets.begin(); it != bullets.end();) {
-		 Bullet* bullet = *it;
-		//if (isOutsideFrustum(bullet->getPosition())){
-			if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 0.2f)){
+		Bullet* bullet = *it;
+		if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 40.0f)){
 			std::cout << "Bullet free!";
 			delete bullet;
 			it = bullets.erase(it);
@@ -479,15 +479,11 @@ int main(int argc, char *argv[])
 }
 
 
-// Frustum far plane
-bool isOutsideFrustum(vec3 const otherPos){
-	return fabs(spaceship.getPosition().x - otherPos.x) > X_FAR;
-}
 // Near plane
 bool isOutsideFrustumNear(vec3 otherPos){ 
 	vec3 diff = otherPos - spaceship.getPosition();
 	std::cout << diff.x << std::endl;
-	return otherPos.x - spaceship.getPosition().x < -50.0f;	// Todo weird constant
+	return otherPos.x - spaceship.getPosition().x < 0;	// Todo weird constant -50?
 }
 
 
@@ -517,8 +513,6 @@ void spawnEnemy(){
 
 	pos.y = randY / 10.0f;
 	pos.z = randZ / 10.0f;
-
-	std::cout << pos.x <<  ", " << spaceship.getPosition().x << std::endl;
 
 	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, 0.0f, pos, ENEMY_DAMAGE));
 }

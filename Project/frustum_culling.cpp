@@ -14,9 +14,9 @@ FrustumCulling::FrustumCulling(vec3 camPos, vec3 lookatPoint, float near, float 
 
 void FrustumCulling::updatePlanes(vec3 camPos, vec3 lookatPoint, float near, float far){
     // Calculate the directions
-    vec3 forwardDir = Normalize(lookatPoint - camPos);
-    vec3 rightDir = Normalize(CrossProduct(vec3(0,1,0), forwardDir));
-    vec3 upDir = Normalize(CrossProduct(rightDir, forwardDir));
+    vec3 forwardDir = vec3(1,0,0);  //Normalize(lookatPoint - camPos);
+    vec3 rightDir = vec3(0,0,1); //Normalize(CrossProduct(vec3(0,1,0), forwardDir));
+    vec3 upDir = vec3(0,1,0); //Normalize(CrossProduct(rightDir, forwardDir));
 
     // Calculate the points of the planes
     vec3 nearPoint = camPos + forwardDir * near;
@@ -25,6 +25,7 @@ void FrustumCulling::updatePlanes(vec3 camPos, vec3 lookatPoint, float near, flo
     // Creating the planes by using the plane equation
     this->farPlane = calculatePlane(upDir, rightDir, farPoint);
     this->nearPlane = calculatePlane(upDir, rightDir, nearPoint);
+
 }
 
 
@@ -32,10 +33,12 @@ void FrustumCulling::updatePlanes(vec3 camPos, vec3 lookatPoint, float near, flo
 bool FrustumCulling::IsInsidePlane(vec4 plane, vec3 center, float radius) const{
 
     // Calc distance from object to plane. 
-    float distanceToCenter = dot(vec3(plane), center) - plane.w;
+    float distanceToCenter = dot(vec3(plane), center) + plane.w; 
+
+    std::cout << "sidt: " << fabs(distanceToCenter) << std::endl;
 
     // return whether the object is inside plane
-    return distanceToCenter > -radius;  
+    return fabs(distanceToCenter) < radius;
 
 }
 
@@ -43,7 +46,7 @@ bool FrustumCulling::IsInsidePlane(vec4 plane, vec3 center, float radius) const{
 
 vec4 FrustumCulling::calculatePlane(vec3 a, vec3 b, vec3 p){
     // Use the plane equiation to calculate the plane spanned by a,b,p
-    vec3 normal = Normalize(CalcNormalVector(a, b, p));	// normal = (A,B,C)
+    vec3 normal = Normalize(CrossProduct(a, b));	// normal = (A,B,C) Todo crossproduct instead of
 	float D = -dot(normal, p);					// D
 
     return vec4(normal.x, normal.y, normal.z, D);

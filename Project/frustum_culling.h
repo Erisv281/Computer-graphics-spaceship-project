@@ -8,6 +8,7 @@
 #include "LittleOBJLoader.h"
 #include "VectorUtils4.h"
 #include "LoadTGA.h"
+#include <iostream>
 
 // This class is based on the current source (https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling)
 class FrustumCulling{
