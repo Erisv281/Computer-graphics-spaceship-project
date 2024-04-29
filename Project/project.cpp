@@ -61,10 +61,10 @@ const double SHOOTING_TIME = 2.0;
 const int BULLET_DAMAGE = 1;
 
 // For enemies
-const std::pair<int, int> SPAWNER_COOLDOWN {2, 7};
+const std::pair<int, int> SPAWNER_COOLDOWN {7, 10};	
 const int ENEMY_HEALTH = 1;
 const int ENEMY_DAMAGE = 1;
-const int ENEMY_SPEED = 0.25f;
+const int ENEMY_SPEED = 1.0f;
 std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
 float enemySpawnCooldown = 2.0f;
 
@@ -76,7 +76,6 @@ const std::pair<int, int> OFFSET_SCREEN_Y {-32, 42};
 
 
 // World
-const double X_FAR = 32.0;
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
 const double SPAWN_DISTANCE = 40.0;
@@ -145,6 +144,10 @@ void drawWorld();
 void drawSpaceship();
 void drawBullet(Bullet* b);
 void drawEnemy(Enemy* e);
+
+// Collisions
+void detectEnemySpaceshipCollision(Enemy* e, float radius);
+
 
 // Todo testing, rename!
 float velY = 0;
@@ -340,6 +343,22 @@ void loadShaders(){
 	printError("init shader");
 }
 
+
+// Based on collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
+void detectEnemySpaceshipCollision(Enemy* e, float radius){
+	vec3 diff;
+	diff = spaceship.getPosition() - e->getPosition(); // Position difference
+
+	std::cout << Norm(diff) << std::endl;
+
+	if (Norm(diff) < 2 * radius) // Close enough to collide? Using Euclidian distance. 
+	{
+		std::cout << "Enemy spaceship collision!\n";
+	}
+}
+
+
+
 void init(void)
 {
 	loadModels();
@@ -353,7 +372,7 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(0, 10.4, 0);	// x=-30.3, y, z=1.42
+	cameraPoint = vec3(-40.0, 10.4, 0);	// x=-30.3, y, z=1.42
 	lookatPoint = vec3(2.82, 0, 0);		// 0.19
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
@@ -364,7 +383,7 @@ void init(void)
 	modelView = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(40.0f, 0.0f, 0.0f), 0);
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0);
 
 	// Enemies
 	enemySpawnTime = std::chrono::system_clock::now();
@@ -382,10 +401,14 @@ void display(void)
 	
 	// Predisplay
 	printError("pre display");
-	glClear(GL_COLOR_BUFFER_BIT);	// clear the screen
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	// clear the screen
+	glDepthFunc(GL_LESS);
 
 	// Continous rotation
 	t = (GLfloat)glutGet(GLUT_ELAPSED_TIME);
+
+	// Enemy spawner handler
+	enemySpawner();
 
 	// Input handler
 	handleInputs();
@@ -399,15 +422,14 @@ void display(void)
 
 	// Todo bind textures here. 
 
-	// Enemy spawner handler
-	enemySpawner();
+	
 
 
 	
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = enemies.begin(); it != enemies.end();) {
 		 Enemy* e = *it;
-		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 40.0)){
+		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f)){
 			std::cout << "Enemy free check!\n";
 			delete e;
 			it = enemies.erase(it);
@@ -428,6 +450,12 @@ void display(void)
 		else{
 			it++;
 		}
+	}
+
+
+	// Collision checks
+	for (Enemy* e : enemies){
+		detectEnemySpaceshipCollision(e, 10.0f);
 	}
 
 	// Draw the furthest objects first
@@ -473,7 +501,7 @@ int main(int argc, char *argv[])
 	glutInit(&argc, argv);
 	glutInitContextVersion(3, 2);
 
-	//glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);	
 	//glutInitContextVersion(3, 2);
 
 	glutInitWindowSize(600, 600);
@@ -599,13 +627,13 @@ void drawBullet(Bullet* bullet){
 
 void drawEnemy(Enemy* e){
 	// Move
-
 	e->move(vec3{-ENEMY_SPEED, 0, 0});	// Todo add lerping here (not moving x, moving yz)
 
 	// Set model-view matrix
 	vec3 pos = e->getPosition();
-	mat4 modification = modelView * T(pos.x - 50.0, pos.y, pos.z);	// Todo testing 50
+	mat4 modification = modelView * T(pos.x, pos.y, pos.z);
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
+
 
 	// Draw
 	DrawModel(e->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
