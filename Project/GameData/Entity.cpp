@@ -4,7 +4,6 @@
 
 
 
-
 // Constructors
 Entity::Entity() : model{nullptr}, health{0}, speed{0.0}, position{vec3(0,0,0)}, damage{0} {}
 Entity::Entity(Model* model, int health, float speed, vec3 position, int damage) : model{new Model{*model}},
@@ -66,7 +65,7 @@ void Entity::setDamage(int damage){
     this->damage = damage;
 }
 
-
+// Decrease health from damage. 
 void Entity::takeDamage(int damage){
     if (this->health - damage <= 0){
         this->health = 0;
@@ -78,11 +77,14 @@ void Entity::takeDamage(int damage){
     
 }
 
+// Moving the position
 void Entity::move(vec3 pos){
     // Placeholder. 
 }
 
+
+// Setting isDead to true. 
 void Entity::die(){
-    this->isDead = true;
+    setIsDead(true);
 }
 

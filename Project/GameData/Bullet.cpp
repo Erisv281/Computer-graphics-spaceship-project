@@ -7,12 +7,8 @@ Bullet::Bullet(Model* model, int health, float speed, vec3 position, int damage,
     this->direction = direction;
 }
 
-// Collision detection
-void Bullet::collisionEnemies(){
-    // Add later
-}
 
-// Move continously, omit the pos parameter
+// Move continously along pos. 
 void Bullet::move(vec3 pos){
     this->position += pos * speed;
 }

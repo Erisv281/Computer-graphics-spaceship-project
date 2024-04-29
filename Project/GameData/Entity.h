@@ -3,7 +3,6 @@
 #ifndef _ENTITY
 #define _ENTITY
 
-
 #include "GL_utilities.h"
 #include "MicroGlut.h"
 #include "LittleOBJLoader.h"

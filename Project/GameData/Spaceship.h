@@ -13,7 +13,6 @@ private:
     // Code inspired by https://www.geeksforgeeks.org/chrono-in-c/
     std::chrono::time_point<std::chrono::system_clock> shootTime;
 
-
     // Rotation
     float rotAngleX{0.0f};
     float rotAngleZ{0.0f};
@@ -36,11 +35,7 @@ public:
     void setRotAngleX(float angle);
     void setRotAngleZ(float angle);
     void setIsShooting(bool isShooting);
-        
-
-    // Collision detection
-    void collisionEnemies();
-    void collisionSurface();
+    
 
     // Move to new position.
     void move(vec3 pos) override;
@@ -53,8 +48,6 @@ public:
 
     // Get the crosshair position
     vec3 getCrosshairPosition();
-
-
     
 
 };

@@ -1,33 +1,24 @@
 // Project main file
 
 
-
 // Includes
-#include "GL_utilities.h"
-#include "MicroGlut.h"
 #define MAIN
-#include "LittleOBJLoader.h"
-#include "VectorUtils4.h"
-#include "LoadTGA.h"
 #include <cmath>
 #include <cstdlib> // For random
-#include <iostream>
 #include <algorithm>
 #include <vector>
-#include <chrono>
 #include <csignal>
 
 // My own includes
-// Todo add to makefile aswell
 #include "./GameData/Spaceship.h"
 #include "./GameData/Bullet.h"
 #include "./GameData/Enemy.h"
-#include "frustum_culling.h"
+#include "./GameData/frustum_culling.h"
+#include "./GameData/Controls.h"
 
 
 
 // Lookat
-// Todo fix later
 vec3 cameraPoint;
 vec3 lookatPoint;
 mat4 look, modelView, projectionMatrix;
@@ -147,6 +138,7 @@ void drawEnemy(Enemy* e);
 
 // Collisions
 void detectEnemySpaceshipCollision(Enemy* e, float radius);
+bool checkEnemyBulletCollision(Enemy* e, float radius);
 
 
 // Todo testing, rename!
@@ -351,10 +343,32 @@ void detectEnemySpaceshipCollision(Enemy* e, float radius){
 
 	std::cout << Norm(diff) << std::endl;
 
-	if (Norm(diff) < 2 * radius) // Close enough to collide? Using Euclidian distance. 
+	if (Norm(diff) < radius) // Close enough to collide? Using Euclidian distance. 
 	{
 		std::cout << "Enemy spaceship collision!\n";
 	}
+}
+
+// Check if this enemy collide with bullet, if so then return true. 
+bool checkEnemyBulletCollision(Enemy* e, float radius){
+
+	for (int i = 0; i < bullets.size(); ++i) {
+		Bullet* b = bullets[i];
+		vec3 diff = b->getPosition() - e->getPosition(); // Position difference
+
+		if (Norm(diff) < radius) {
+			// Enemy takes damage. 
+			e->takeDamage(b->getDamage());
+
+			// Erase the bullet
+			delete b;
+			bullets.erase(bullets.begin() + i); 
+
+			// Return death status
+			return e->getIsDead();
+		}
+	}
+	return false;
 }
 
 
@@ -372,7 +386,7 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(-40.0, 10.4, 0);	// x=-30.3, y, z=1.42
+	cameraPoint = vec3(-20.0, 10.4, 0);	// x=-30.3, y, z=1.42
 	lookatPoint = vec3(2.82, 0, 0);		// 0.19
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
@@ -423,9 +437,6 @@ void display(void)
 	// Todo bind textures here. 
 
 	
-
-
-	
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
 	for (auto it = enemies.begin(); it != enemies.end();) {
 		 Enemy* e = *it;
@@ -453,10 +464,21 @@ void display(void)
 	}
 
 
-	// Collision checks
-	for (Enemy* e : enemies){
-		detectEnemySpaceshipCollision(e, 10.0f);
+	// Collision checks Enemy with spaceship and bullets
+	for (auto it = enemies.begin(); it != enemies.end();) {
+		Enemy* e = *it;
+		detectEnemySpaceshipCollision(e, 8.0f);
+		if(checkEnemyBulletCollision(e, 4.0f)){
+
+			
+			delete e;
+			it = enemies.erase(it);
+		}
+		else{
+			it++;
+		}
 	}
+	
 
 	// Draw the furthest objects first
 	drawWorld();
@@ -563,7 +585,7 @@ void spawnEnemy(){
 void drawWorld(){
 	glUseProgram(program);
 	mat4 trans = T(0.0f, 0, 0.0f);
-	mat4 scale = S(500.0f, 0.5f, 500.0f);
+	mat4 scale = S(500.0f, 0.1f, 500.0f);
 	mat4 rotation = Ry(0);
 	mat4 modification = trans * scale * rotation;
 	mat4 total = modelView * modification;
@@ -580,7 +602,7 @@ void drawSpaceship(){
 	vec3 posCross = spaceship.getCrosshairPosition();
 	mat4 modification2 = T(posCross.x, posCross.y, posCross.z);
 	mat4 rotation2 = Rz(90.0f);
-	mat4 scaling2 = S(2.0, 2.0, 2.0);
+	mat4 scaling2 = S(0.2, 0.2, 0.2);
 	mat4 total2 = modelView * modification2 * rotation2 * scaling2;
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total2.m);
@@ -602,7 +624,7 @@ void drawSpaceship(){
 	vec3 pos = spaceship.getPosition();
 	mat4 modification = T(pos.x, pos.y, pos.z);
 	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
-	mat4 scaling = S(1.5, 1.5, 1.5);
+	mat4 scaling = S(1.0, 1.0, 1.0);
 	spaceshipModelMatrix = modelView * modification * rotation * scaling;
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, spaceshipModelMatrix.m);
 
@@ -631,7 +653,7 @@ void drawEnemy(Enemy* e){
 
 	// Set model-view matrix
 	vec3 pos = e->getPosition();
-	mat4 modification = modelView * T(pos.x, pos.y, pos.z);
+	mat4 modification = modelView * T(pos.x, pos.y, pos.z) * S(10.0, 10.0, 10.0);
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
 
 

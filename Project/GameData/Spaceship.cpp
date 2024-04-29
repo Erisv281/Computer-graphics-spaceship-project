@@ -22,9 +22,6 @@ Spaceship& Spaceship::operator=(const Spaceship& other){
     return *this;
 }
 
-// Collision detection
-void Spaceship::collisionEnemies(){}
-void Spaceship::collisionSurface(){}
 
 // Move to new position. Todo fix later
 void Spaceship::move(vec3 pos){
@@ -58,6 +55,8 @@ bool Spaceship::isShootCooldownWlapsed(double cooldown) const{
 
 }
 
+
+// Returns the crosshair position by modifying xy position. 
 vec3 Spaceship::getCrosshairPosition(){
     vec3 pos = this->position;
     pos.x += 3.0f;
