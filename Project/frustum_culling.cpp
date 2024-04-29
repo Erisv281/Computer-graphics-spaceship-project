@@ -35,8 +35,6 @@ bool FrustumCulling::IsInsidePlane(vec4 plane, vec3 center, float radius) const{
     // Calc distance from object to plane. 
     float distanceToCenter = dot(vec3(plane), center) + plane.w; 
 
-    std::cout << "sidt: " << fabs(distanceToCenter) << std::endl;
-
     // return whether the object is inside plane
     return fabs(distanceToCenter) < radius;
 

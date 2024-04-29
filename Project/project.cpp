@@ -64,7 +64,7 @@ const int BULLET_DAMAGE = 1;
 const std::pair<int, int> SPAWNER_COOLDOWN {2, 7};
 const int ENEMY_HEALTH = 1;
 const int ENEMY_DAMAGE = 1;
-const int ENEMY_SPEED = 1.0f;
+const int ENEMY_SPEED = 0.25f;
 std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
 float enemySpawnCooldown = 2.0f;
 
@@ -131,6 +131,7 @@ void handleInputs();
 void handleInputsAngles();
 void handleMovement(float& velocity, char moveKey, float acceleration);
 void handleAngle(float& angle, char angleKey, float acceleration);
+vec3 calculateBulletDirection();
 
 
 bool isOutsideFrustum(vec3 const otherPos);
@@ -184,6 +185,11 @@ void handleDeacceleration(float& movement, char key1, char key2, float friction)
 			movement = 0.0f;
 		}
 	}
+}
+
+// rotAngleZ for rotating the direction y and rotAngleX for rotating the direction Z. 
+vec3 calculateBulletDirection(){
+	return vec3(0, rotAngleZ, rotAngleX);
 }
 
 void handleInputsAngles(){
@@ -265,11 +271,14 @@ void handleInputs(){
 	handleDeacceleration(velY, 'w', 's', FRICTION_COEFFICIENT_DEC);
 
 	
+
+	
 	// If Pressing space and can shoot
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
 		// Spawn bullet as my position
 		spaceship.shoot();
-		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE));
+		vec3 bullPos = calculateBulletDirection();
+		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, bullPos));
 	}
 
 	// Max velocity checks. 
@@ -391,7 +400,8 @@ void display(void)
 	// Todo bind textures here. 
 
 	// Enemy spawner handler
-	//enemySpawner();
+	enemySpawner();
+
 
 	
 	// Using a seperate loop to avoid pointer/iterator invalidation. 
@@ -482,7 +492,6 @@ int main(int argc, char *argv[])
 // Near plane
 bool isOutsideFrustumNear(vec3 otherPos){ 
 	vec3 diff = otherPos - spaceship.getPosition();
-	std::cout << diff.x << std::endl;
 	return otherPos.x - spaceship.getPosition().x < 0;	// Todo weird constant -50?
 }
 
@@ -504,15 +513,16 @@ void enemySpawner(){
 }
 
 void spawnEnemy(){
-	// Set random position within y[1,2] and z[10, 11.8]
-	// Random decimals via y [10,20] then divided by 10. 
+	// Set random position within 
 	vec3 pos = spaceship.getPosition();
 	pos.x += SPAWN_DISTANCE;
-	int randZ = rand() % 10 + 11;
-	int randY = rand() % 19 + 100;
+	int randZ = rand() % 5 - 2;
+	int randY = rand() % 5 + 9;	// Todo might need fixing these random coordinates. 
 
-	pos.y = randY / 10.0f;
-	pos.z = randZ / 10.0f;
+	//std::cout << randZ << ", " << randY << std::endl;
+
+	pos.y = randY;
+	pos.z = randZ;
 
 	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, 0.0f, pos, ENEMY_DAMAGE));
 }
@@ -575,7 +585,8 @@ void drawSpaceship(){
 
 void drawBullet(Bullet* bullet){
 	// Move
-	bullet->move(vec3{BULLET_SPEED,0,0});
+	vec3 dir = bullet->getDirection();
+	bullet->move(vec3{1.0f, dir.y, dir.z});	// todo check later
 
 	// Set model-view matrix
 	vec3 pos = bullet->getPosition();
@@ -588,7 +599,8 @@ void drawBullet(Bullet* bullet){
 
 void drawEnemy(Enemy* e){
 	// Move
-	e->move(vec3{-ENEMY_SPEED,0,0});	// Todo add lerping here (not moving x, moving yz)
+
+	e->move(vec3{-ENEMY_SPEED, 0, 0});	// Todo add lerping here (not moving x, moving yz)
 
 	// Set model-view matrix
 	vec3 pos = e->getPosition();
