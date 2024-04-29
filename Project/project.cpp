@@ -21,7 +21,7 @@
 // Lookat
 vec3 cameraPoint;
 vec3 lookatPoint;
-mat4 look, modelView, projectionMatrix;
+mat4 look, worldMatrix, projectionMatrix;
 
 // Timer
 GLfloat t;
@@ -58,12 +58,6 @@ const int ENEMY_DAMAGE = 1;
 const int ENEMY_SPEED = 1.0f;
 std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
 float enemySpawnCooldown = 2.0f;
-
-
-// Screen offset boundaries
-const std::pair<int, int> OFFSET_SCREEN_Z {-36, 36};
-const std::pair<int, int> OFFSET_SCREEN_Y {-32, 42};
-
 
 
 // World
@@ -109,193 +103,62 @@ vec3 colors[] =
 	0.0f, 0.0f, 1.0f
 };
 
-
-// Programs
-GLuint program;
-
-// Prototypes
-void loadModels();
-void initTextures();
-
-void handleInputs();
-void handleInputsAngles();
-void handleMovement(float& velocity, char moveKey, float acceleration);
-void handleAngle(float& angle, char angleKey, float acceleration);
-vec3 calculateBulletDirection();
-
-
-bool isOutsideFrustum(vec3 const otherPos);
-bool isOutsideFrustumNear(vec3 otherPos);
-
-
-void enemySpawner();
-void spawnEnemy();
-
-void drawWorld();
-void drawSpaceship();
-void drawBullet(Bullet* b);
-void drawEnemy(Enemy* e);
-
-// Collisions
-void detectEnemySpaceshipCollision(Enemy* e, float radius);
-bool checkEnemyBulletCollision(Enemy* e, float radius);
-
-
-// Todo testing, rename!
-float velY = 0;
-float velZ = 0;
+// For movement controls
+float velocityY{0.0f};
+float velocityZ{0.0f};
 float rotAngleX{0.0f};
 float rotAngleZ{0.0f};
 vec3 nextPosition{0,0,0};
 
 
-const float ACCELERATION_VERTICAL = 0.2f;
-const float ACCELERATION_HORIZONTAL = 0.1f;
-const float MAX_VELOCITY_HORIZONTAL = 3.0f;
-const float MAX_VELOCITY_VERTICAL = 3.0f;
-const float FRICTION_COEFFICIENT_ACC = 3.0f;
-const float FRICTION_COEFFICIENT_DEC = 0.5f;
+// Programs
+GLuint program;
 
-const float ANGULAR_ACCELERATION_X = 0.3f; 
-const float ANGULAR_ACCELERATION_Z = 0.15f;
-const float MAX_ROT_X = 1.0f; 	
-const float MAX_ROT_Z = 0.5f;	
-const float ANGULAR_FRICTION_ACC = 0.95;
-const float ANGULAR_FRICTION_DEC = 0.95;
+// Prototypes
 
+// Enemy spawn
+void enemySpawner();
+void spawnEnemy();
 
+// Draw functions
+void drawWorld();
+void drawSpaceship();
+void drawEnemy(Enemy* e);
 
-void handleAcceleration(float& movement, char moveKey, float acceleration, float friction){
-	if (glutKeyIsDown(moveKey)){
-		movement += acceleration * friction;
-	}
-}
+// Collision functions
+void detectEnemySpaceshipCollision(Enemy* e, float radius);
+bool checkEnemyBulletCollision(Enemy* e, float radius);
 
 
-// If not pressing either key1 nor key2. Then apply deacceleration friction to the data. 
-void handleDeacceleration(float& movement, char key1, char key2, float friction){
-	if (!(glutKeyIsDown(key1) || glutKeyIsDown(key2))) {
-		movement *= friction;
-		if (fabs(movement) < 0.01f) {
-			movement = 0.0f;
-		}
-	}
-}
-
-// rotAngleZ for rotating the direction y and rotAngleX for rotating the direction Z. 
-vec3 calculateBulletDirection(){
-	return vec3(0, rotAngleZ, rotAngleX);
-}
-
-void handleInputsAngles(){
-	vec3 spaceshipPos = spaceship.getPosition();
+void handleControls(){
 	rotAngleX = spaceship.getRotAngleX();
 	rotAngleZ = spaceship.getRotAngleZ();
 
-	// Handle rotations
-	if (spaceshipPos.y < OFFSET_SCREEN_Y.second){
-		handleAcceleration(rotAngleZ, 'w', ANGULAR_ACCELERATION_Z, ANGULAR_FRICTION_ACC);
-	}
-	if (spaceshipPos.y > OFFSET_SCREEN_Y.first){
-		handleAcceleration(rotAngleZ, 's', -ANGULAR_ACCELERATION_Z, ANGULAR_FRICTION_ACC);
-	}
-	if (spaceshipPos.z > OFFSET_SCREEN_Z.first){
-		handleAcceleration(rotAngleX, 'a', -ANGULAR_ACCELERATION_X, ANGULAR_FRICTION_ACC);
-	}
-	if (spaceshipPos.z < OFFSET_SCREEN_Z.second){
-		handleAcceleration(rotAngleX, 'd', ANGULAR_ACCELERATION_X, ANGULAR_FRICTION_ACC);
-	}
+	// Handle rotation and movement velocity. 
+    handleInputsAngles(rotAngleX, rotAngleZ, spaceship.getPosition());
+    handleInputs(velocityY, velocityZ, nextPosition, spaceship.getPosition());
 
-	// Angle friction deacceleration
-	handleDeacceleration(rotAngleX, 'a', 'd', ANGULAR_FRICTION_DEC);
-	handleDeacceleration(rotAngleZ, 'w', 's', ANGULAR_FRICTION_DEC);
-
-	// Max Angle checks. 
-	rotAngleZ = rotAngleZ < -MAX_ROT_Z ? -MAX_ROT_Z : rotAngleZ;
-	rotAngleZ = rotAngleZ > MAX_ROT_Z ? MAX_ROT_Z : rotAngleZ;
-
-	rotAngleX = rotAngleX < -MAX_ROT_X ? -MAX_ROT_X : rotAngleX;
-	rotAngleX = rotAngleX > MAX_ROT_X ? MAX_ROT_X : rotAngleX;
+	// Set next position by velocity
+	nextPosition.x = GAME_SPEED;
+	nextPosition.y += velocityY;
+	nextPosition.z += velocityZ;
 	
 
-}
-
-// WS = Move up and down
-// AD = Move left and right
-void handleInputs(){
-	// Next position of spaceship. 
-	nextPosition = vec3{GAME_SPEED,0,0};
-	vec3 spaceshipPos = spaceship.getPosition();
-
-	// Move Up W
-	if (spaceshipPos.y < OFFSET_SCREEN_Y.second){
-		handleAcceleration(velY, 'w', ACCELERATION_VERTICAL, FRICTION_COEFFICIENT_ACC);
-	}
-	else{
-		if (!glutKeyIsDown('s')){velY = 0.0f;}
-	}
-
-
-	// Move Down S
-	if (spaceshipPos.y > OFFSET_SCREEN_Y.first){
-		handleAcceleration(velY, 's', -ACCELERATION_VERTICAL, FRICTION_COEFFICIENT_ACC);
-	}
-	else{
-		if (!glutKeyIsDown('w')){velY = 0.0f;}
-	}
-	
-
-	// Move Left A
-	if (spaceshipPos.z > OFFSET_SCREEN_Z.first){
-		handleAcceleration(velZ, 'a', -ACCELERATION_HORIZONTAL, FRICTION_COEFFICIENT_ACC);		
-	}
-	else{
-		if (!glutKeyIsDown('d')){velZ = 0.0f;}
-	}
-
-	// Move Right D
-	if (spaceshipPos.z < OFFSET_SCREEN_Z.second){
-		handleAcceleration(velZ, 'd', ACCELERATION_HORIZONTAL, FRICTION_COEFFICIENT_ACC);	
-	}
-	else{
-		if (!glutKeyIsDown('a')){velZ = 0.0f;}
-	}
-
-	// Handle friction deacceleration
-	handleDeacceleration(velZ, 'a', 'd', FRICTION_COEFFICIENT_DEC);
-	handleDeacceleration(velY, 'w', 's', FRICTION_COEFFICIENT_DEC);
-
-	
-
-	
-	// If Pressing space and can shoot
+    // If Pressing space and can shoot, then spawn bullet at spaceship position. 
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
-		// Spawn bullet as my position
 		spaceship.shoot();
-		vec3 bullPos = calculateBulletDirection();
+		vec3 bullPos = calculateBulletDirection(rotAngleZ, rotAngleX);
 		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, bullPos));
 	}
 
-	// Max velocity checks. 
-	velZ = velZ < -MAX_VELOCITY_HORIZONTAL ? -MAX_VELOCITY_HORIZONTAL : velZ;
-	velZ = velZ > MAX_VELOCITY_HORIZONTAL ? MAX_VELOCITY_HORIZONTAL : velZ;
-
-	velY = velY < -MAX_VELOCITY_VERTICAL ? -MAX_VELOCITY_VERTICAL : velY;
-	velY = velY > MAX_VELOCITY_VERTICAL ? MAX_VELOCITY_VERTICAL : velY;
-
-
-	// Here cameraPoint.z += velZ and y!
-	nextPosition.y += velY;
-	nextPosition.z += velZ;
-
-	// send camera position to shader, camera pos already in world cooridnates. 
-	//glUniform3f(glGetUniformLocation(program, "camera_pos"), cameraPoint.x, cameraPoint.y, cameraPoint.z);
-
-	// Lookat here
+	// Setting lookat(world-view) matrix here
 	cameraPoint.x += GAME_SPEED;	// Game increase x-axis
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 	glUniformMatrix4fv(glGetUniformLocation(program, "lookat"), 1, GL_TRUE, look.m);
+
 }
+
+
 
 void loadModels(){
 	world = LoadDataToModel(vertices, vertex_normals, tex_coords, colors, indices, 4, 6);	// Or 4*3
@@ -394,7 +257,7 @@ void init(void)
 	frustumCulling = FrustumCulling(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
 	// Model-world matrix
-	modelView = IdentityMatrix();
+	worldMatrix = IdentityMatrix();
 
 	// Spaceship
 	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0);
@@ -425,9 +288,10 @@ void display(void)
 	enemySpawner();
 
 	// Input handler
-	handleInputs();
-	handleInputsAngles();
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modelView.m);
+	handleControls();
+	
+	// Set projection. 
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, worldMatrix.m);
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
@@ -490,8 +354,7 @@ void display(void)
 
 	// Detect bullet collisions
 	for (Bullet* b : bullets){
-		drawBullet(b);
-		// Todo check world-bullet collision?
+		b->draw(program, worldMatrix);
 	}
 
 	drawSpaceship();
@@ -539,12 +402,6 @@ int main(int argc, char *argv[])
 }
 
 
-// Near plane
-bool isOutsideFrustumNear(vec3 otherPos){ 
-	vec3 diff = otherPos - spaceship.getPosition();
-	return otherPos.x - spaceship.getPosition().x < 0;	// Todo weird constant -50?
-}
-
 
 // Enemy spawn:
 void enemySpawner(){
@@ -588,7 +445,7 @@ void drawWorld(){
 	mat4 scale = S(500.0f, 0.1f, 500.0f);
 	mat4 rotation = Ry(0);
 	mat4 modification = trans * scale * rotation;
-	mat4 total = modelView * modification;
+	mat4 total = worldMatrix * modification;
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
 
 	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
@@ -603,7 +460,7 @@ void drawSpaceship(){
 	mat4 modification2 = T(posCross.x, posCross.y, posCross.z);
 	mat4 rotation2 = Rz(90.0f);
 	mat4 scaling2 = S(0.2, 0.2, 0.2);
-	mat4 total2 = modelView * modification2 * rotation2 * scaling2;
+	mat4 total2 = worldMatrix * modification2 * rotation2 * scaling2;
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total2.m);
 	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
@@ -625,26 +482,12 @@ void drawSpaceship(){
 	mat4 modification = T(pos.x, pos.y, pos.z);
 	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
 	mat4 scaling = S(1.0, 1.0, 1.0);
-	spaceshipModelMatrix = modelView * modification * rotation * scaling;
+	spaceshipModelMatrix = worldMatrix * modification * rotation * scaling;
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, spaceshipModelMatrix.m);
 
 	// Draw
 	DrawModel(spaceship.getModel(), program, "in_Position", "in_Normal", "inTexCoord");
 
-}
-
-void drawBullet(Bullet* bullet){
-	// Move
-	vec3 dir = bullet->getDirection();
-	bullet->move(vec3{1.0f, dir.y, dir.z});	// todo check later
-
-	// Set model-view matrix
-	vec3 pos = bullet->getPosition();
-	mat4 total = modelView * T(pos.x, pos.y, pos.z) * S(2.0, 2.0, 2.0);
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
-
-	// Draw
-	DrawModel(bullet->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
 }
 
 void drawEnemy(Enemy* e){
@@ -653,7 +496,7 @@ void drawEnemy(Enemy* e){
 
 	// Set model-view matrix
 	vec3 pos = e->getPosition();
-	mat4 modification = modelView * T(pos.x, pos.y, pos.z) * S(10.0, 10.0, 10.0);
+	mat4 modification = worldMatrix * T(pos.x, pos.y, pos.z) * S(10.0, 10.0, 10.0);
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
 
 

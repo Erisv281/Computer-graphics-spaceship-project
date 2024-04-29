@@ -15,11 +15,11 @@ public:
     Bullet();
     Bullet(Model* model, int health, float speed, vec3 position, int damage, vec3 direction);
 
-    // Move to new position.
-    void move(vec3 pos) override;
-
     // Getter
     inline vec3 getDirection() const { return this->direction; }
+
+    void move(vec3 pos) override;
+    void draw(GLuint program, mat4 worldMatrix) override;
     
 
 };

@@ -16,6 +16,8 @@ public:
     // Move to new position.
     void move(vec3 pos) override;
 
+    
+
 };
 
 

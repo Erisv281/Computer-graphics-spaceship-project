@@ -82,6 +82,10 @@ void Entity::move(vec3 pos){
     // Placeholder. 
 }
 
+void Entity::draw(GLuint program, mat4 worldMatrix){
+    // Placeholder
+}
+
 
 // Setting isDead to true. 
 void Entity::die(){

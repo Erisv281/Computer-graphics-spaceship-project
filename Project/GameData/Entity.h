@@ -55,6 +55,9 @@ public:
     // Move to new position.
     virtual void move(vec3 pos);
 
+    // Draw function to new position.
+    virtual void draw(GLuint program, mat4 worldMatrix);
+
     // When no HP left, 
     virtual void die();
 
