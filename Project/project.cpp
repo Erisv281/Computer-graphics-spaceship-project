@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 #include <csignal>
+#include <string>
 
 // My own includes
 #include "./GameData/Spaceship.h"
@@ -15,6 +16,7 @@
 #include "./GameData/Enemy.h"
 #include "./GameData/frustum_culling.h"
 #include "./GameData/Controls.h"
+#include "./GameData/simplefont.h"
 
 
 
@@ -30,7 +32,6 @@ FrustumCulling frustumCulling;
 
 
 // Models
-Model* world;
 Model* spaceshipModel;
 Model* bulletModel;
 Model* enemyModel;
@@ -78,45 +79,8 @@ vec3 nextPosition{0,0,0};
 GLuint program;
 GLuint programSky;
 
-
-// Todo might remove these
-
-#define kGroundSize 100.0f
-vec3 vertices[] =
-{
- vec3(-kGroundSize,0.0f,-kGroundSize),
- vec3(-kGroundSize,0.0f,kGroundSize),
- vec3(kGroundSize,-0.0f,-kGroundSize),
- vec3(kGroundSize,-0.0f,kGroundSize)
-};
-
-vec3 vertex_normals[] =
-{
-  vec3(0.0f,1.0f,0.0f),
-  vec3(0.0f,1.0f,0.0f),
-  vec3(0.0f,1.0f,0.0f),
-  vec3(0.0f,1.0f,0.0f)
-};
-
-vec2 tex_coords[] =
-{
-  vec2(0.0f,0.0f),
-  vec2(0.0f,20.0f),
-  vec2(20.0f,0.0f), 
-  vec2(20.0f,20.0f)
-};
-GLuint indices[] =
-{
-  0, 1, 2, 1, 3, 2
-};
-
-vec3 colors[] = 
-{
-	1.0f, 0.0f, 0.0f,
-	0.0f, 1.0f, 0.0f,
-	0.0f, 0.0f, 1.0f
-};
-
+// Testing
+int score = 0;
 
 
 void handleControls(){
@@ -150,8 +114,6 @@ void handleControls(){
 
 
 void loadModels(){
-	world = LoadDataToModel(vertices, vertex_normals, tex_coords, colors, indices, 4, 6);
-
 	spaceshipModel = LoadModel("../Models/teapot.obj");
 	bulletModel = LoadModel("../Models/groundsphere.obj");
 	enemyModel = LoadModel("../Models/teddy.obj");
@@ -254,18 +216,6 @@ bool checkEnemyBulletCollision(Enemy* e, float radius){
 	return false;
 }
 
-// Todo maybe fix using other code
-void drawWorld(){
-	glUseProgram(program);
-	
-	// Set model-world matrix
-	mat4 total = worldMatrix * T(0.0f, 0, 0.0f) * S(500.0f, 0.1f, 500.0f);
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, total.m);
-
-	// Draw model
-	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
-
-}
 
 // Draw the crosshair for the spaceship
 void drawCrossHair(){
@@ -335,6 +285,18 @@ void drawSkybox(){
 }
 
 
+// This code is based on Ingemar Ragnemalm's simplefont.c
+void setFont(std::string s, int width, int height){
+	sfSetFont(-1);	// Default font
+	sfSetFontColor(1, 1, 1);
+
+	// https://stackoverflow.com/questions/10847237/how-to-convert-from-int-to-char
+	char const *pchar = s.c_str();  //use char const* as target type
+	char* text = const_cast<char*>(pchar);
+	sfDrawString(width, height, text);
+}
+
+
 
 
 
@@ -388,8 +350,8 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	// clear the screen
 	glDepthFunc(GL_LESS);
 
-	// Continous rotation
-	t = (GLfloat)glutGet(GLUT_ELAPSED_TIME);
+	// Continous time t
+	t = (GLfloat)glutGet(GLUT_ELAPSED_TIME) / 1000;
 
 	// Enemy spawner handler
 	enemySpawner();
@@ -440,10 +402,6 @@ void display(void)
 	drawSkybox();
 	glUseProgram(program);	// Back to using the initial program
 
-
-	// Draw the world
-	//drawWorld();
-
 	// Draw enemies
 	glActiveTexture(GL_TEXTURE1);	
 	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
@@ -469,6 +427,12 @@ void display(void)
 	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
 	drawCrossHair();
 	spaceship.draw(program, worldMatrix);
+
+
+
+	// UI Fonts for score and health
+	setFont("Score: " + std::to_string(score), 100, 100);
+	setFont("Health: " + std::to_string(spaceship.getHealth()), 100, 120);
 
 
 	// Post display
