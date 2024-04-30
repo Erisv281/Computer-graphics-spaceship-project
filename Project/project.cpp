@@ -38,7 +38,7 @@ Model* crosshairModel;
 Model* skybox;
 
 // Tex references
-GLuint skyBoxTex, texEnemy;	// 0
+GLuint skyBoxTex, texEnemy, texSpaceship, texBullet;	// 0 1 2 3
 
 // GameData
 Spaceship spaceship;
@@ -168,6 +168,10 @@ void initTextures(){
 	// Load textures
 	LoadTGATextureSimple("../Models/cloud-landscape.tga", &skyBoxTex);
 	LoadTGATextureSimple("../Models/Textures/stone4_b.tga", &texEnemy);
+	LoadTGATextureSimple("../Models/Textures/kt_rot_2.tga", &texSpaceship);
+	LoadTGATextureSimple("../Models/Textures/kt_stone03.tga", &texBullet);
+
+	
 
 	// todo add more textures here. 
 
@@ -180,6 +184,16 @@ void initTextures(){
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, texEnemy);
 	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
+
+	// Tex 2 for spaceship
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, texSpaceship);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
+
+	// Tex 3 for bullet
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, texBullet);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 3);
 
 }
 
@@ -431,11 +445,15 @@ void display(void)
 	//drawWorld();
 
 	// Draw enemies
+	glActiveTexture(GL_TEXTURE1);	
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
 	for (Enemy* e : enemies){
 		e->draw(program, worldMatrix);
 	}
 
 	// Draw bullets
+	glActiveTexture(GL_TEXTURE3);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 3);
 	for (Bullet* b : bullets){
 		b->draw(program, worldMatrix);
 	}
@@ -447,6 +465,8 @@ void display(void)
 	spaceship.setRotAngleZ(rotAngleZ);
 
 	// Draw spaceship and crosshair
+	glActiveTexture(GL_TEXTURE2);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
 	drawCrossHair();
 	spaceship.draw(program, worldMatrix);
 
