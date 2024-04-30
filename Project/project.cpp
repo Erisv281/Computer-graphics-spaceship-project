@@ -48,7 +48,6 @@ const float MOVE_SPEED = 2.0f;
 const float BULLET_SPEED = 4.0f;
 
 // Shooting
-const double SHOOTING_TIME = 2.0;
 const int BULLET_DAMAGE = 1;
 
 // For enemies
@@ -64,7 +63,6 @@ float enemySpawnCooldown = 2.0f;
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
 const double SPAWN_DISTANCE = 40.0;
-mat4 spaceshipModelMatrix;
 
 
 #define kGroundSize 100.0f
@@ -122,8 +120,7 @@ void spawnEnemy();
 
 // Draw functions
 void drawWorld();
-void drawSpaceship();
-void drawEnemy(Enemy* e);
+void drawCrossHair();
 
 // Collision functions
 void detectEnemySpaceshipCollision(Enemy* e, float radius);
@@ -161,7 +158,7 @@ void handleControls(){
 
 
 void loadModels(){
-	world = LoadDataToModel(vertices, vertex_normals, tex_coords, colors, indices, 4, 6);	// Or 4*3
+	world = LoadDataToModel(vertices, vertex_normals, tex_coords, colors, indices, 4, 6);
 
 	spaceshipModel = LoadModel("../Models/teapot.obj");
 	bulletModel = LoadModel("../Models/groundsphere.obj");
@@ -238,19 +235,20 @@ bool checkEnemyBulletCollision(Enemy* e, float radius){
 
 void init(void)
 {
+	// Init models, textures, shaders
 	loadModels();
 	initTextures();
 	GLInits();
     loadShaders();	
 
 	// Projection
-	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, PROJECTION_NEAR, PROJECTION_FAR);	// far = 50.0, near = 0.2
+	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, PROJECTION_NEAR, PROJECTION_FAR);
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Lookat matrix init
-	cameraPoint = vec3(-20.0, 10.4, 0);	// x=-30.3, y, z=1.42
-	lookatPoint = vec3(2.82, 0, 0);		// 0.19
+	cameraPoint = vec3(-20.0, 10.4, 0);
+	lookatPoint = vec3(2.82, 0, 0);	
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
 	// Frustum culling
@@ -291,7 +289,7 @@ void display(void)
 	handleControls();
 	
 	// Set projection. 
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, worldMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, worldMatrix.m);
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
@@ -301,11 +299,15 @@ void display(void)
 	// Todo bind textures here. 
 
 	
-	// Using a seperate loop to avoid pointer/iterator invalidation. 
+	// Check collision for each enemy between near frustum plane, spaceship and bullets. 
 	for (auto it = enemies.begin(); it != enemies.end();) {
-		 Enemy* e = *it;
-		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f)){
-			std::cout << "Enemy free check!\n";
+		Enemy* e = *it;
+
+		// Check spaceship-Enemy collision
+		detectEnemySpaceshipCollision(e, 8.0f);	// Todo radius
+
+		// Delete enemy if inside near plane or collide with bullets. 
+		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e, 4.0f)){
 			delete e;
 			it = enemies.erase(it);
 		}
@@ -313,12 +315,10 @@ void display(void)
 			it++;
 		}
 	}
-	// Bullet free check. 
-	// Using a seperate loop to avoid pointer/iterator invalidation. 
+	// Check collision between each bullet and the far plane
 	for (auto it = bullets.begin(); it != bullets.end();) {
 		Bullet* bullet = *it;
 		if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 40.0f)){
-			std::cout << "Bullet free!";
 			delete bullet;
 			it = bullets.erase(it);
 		}
@@ -328,36 +328,29 @@ void display(void)
 	}
 
 
-	// Collision checks Enemy with spaceship and bullets
-	for (auto it = enemies.begin(); it != enemies.end();) {
-		Enemy* e = *it;
-		detectEnemySpaceshipCollision(e, 8.0f);
-		if(checkEnemyBulletCollision(e, 4.0f)){
-
-			
-			delete e;
-			it = enemies.erase(it);
-		}
-		else{
-			it++;
-		}
-	}
-	
-
-	// Draw the furthest objects first
+	// Draw the world
 	drawWorld();
 
 	// Draw enemies
 	for (Enemy* e : enemies){
-		drawEnemy(e);
+		e->draw(program, worldMatrix);
 	}
 
-	// Detect bullet collisions
+	// Draw bullets
 	for (Bullet* b : bullets){
 		b->draw(program, worldMatrix);
 	}
 
-	drawSpaceship();
+
+	// Set spaceship movement and rotation.
+	spaceship.move(nextPosition);
+	spaceship.setRotAngleX(rotAngleX);
+	spaceship.setRotAngleZ(rotAngleZ);
+
+	// Draw spaceship and crosshair
+	drawCrossHair();
+	spaceship.draw(program, worldMatrix);
+
 
 	// Post display
 	printError("display");
@@ -381,20 +374,19 @@ void signalHandler(int signum){
 
 int main(int argc, char *argv[])
 {
-	signal(SIGINT, signalHandler);	// Free dynamic memory
+	// Free dynamic memory
+	signal(SIGINT, signalHandler);
 
 	glutInit(&argc, argv);
 	glutInitContextVersion(3, 2);
-
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);	
-	//glutInitContextVersion(3, 2);
-
 	glutInitWindowSize(600, 600);
 	glutCreateWindow ("Project");
 
 	// Animation
 	glutRepeatingTimer(150);
 
+	// Init
 	glutDisplayFunc(display); 
 	init ();
 	glutMainLoop();
@@ -431,76 +423,31 @@ void spawnEnemy(){
 	pos.y = randY;
 	pos.z = randZ;
 
-	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, 0.0f, pos, ENEMY_DAMAGE));
+	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE));
 }
 
 
-// Draw functions
-
-
-// Todo fix using other code
+// Todo maybe fix using other code
 void drawWorld(){
 	glUseProgram(program);
-	mat4 trans = T(0.0f, 0, 0.0f);
-	mat4 scale = S(500.0f, 0.1f, 500.0f);
-	mat4 rotation = Ry(0);
-	mat4 modification = trans * scale * rotation;
-	mat4 total = worldMatrix * modification;
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
+	
+	// Set model-world matrix
+	mat4 total = worldMatrix * T(0.0f, 0, 0.0f) * S(500.0f, 0.1f, 500.0f);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, total.m);
 
+	// Draw model
 	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
 
 }
 
-void drawSpaceship(){
-	glUseProgram(program);
-
-	// Draw crosshair first. 
+// Draw the crosshair for the spaceship
+void drawCrossHair(){
+	// Set model-world matrix
 	vec3 posCross = spaceship.getCrosshairPosition();
-	mat4 modification2 = T(posCross.x, posCross.y, posCross.z);
-	mat4 rotation2 = Rz(90.0f);
-	mat4 scaling2 = S(0.2, 0.2, 0.2);
-	mat4 total2 = worldMatrix * modification2 * rotation2 * scaling2;
+	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * S(0.2, 0.2, 0.2);
 
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total2.m);
+	// Draw model
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, totalCross.m);
 	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
-
-
-	// Draw spaceship here
-	// If spaceship is shooting and time has elapsed, then allow shooting again. 
-	if (spaceship.getIsShooting() && spaceship.isShootCooldownWlapsed(SHOOTING_TIME)){
-		spaceship.setIsShooting(false);
-	}
-
-	// Move and rotate
-	spaceship.move(nextPosition);
-	spaceship.setRotAngleX(rotAngleX);
-	spaceship.setRotAngleZ(rotAngleZ);
-
-	// Set Model-view matrix
-	vec3 pos = spaceship.getPosition();
-	mat4 modification = T(pos.x, pos.y, pos.z);
-	mat4 rotation = Rx(rotAngleX) * Rz(rotAngleZ);
-	mat4 scaling = S(1.0, 1.0, 1.0);
-	spaceshipModelMatrix = worldMatrix * modification * rotation * scaling;
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, spaceshipModelMatrix.m);
-
-	// Draw
-	DrawModel(spaceship.getModel(), program, "in_Position", "in_Normal", "inTexCoord");
-
 }
 
-void drawEnemy(Enemy* e){
-	// Move
-	e->move(vec3{-ENEMY_SPEED, 0, 0});	// Todo add lerping here (not moving x, moving yz)
-
-	// Set model-view matrix
-	vec3 pos = e->getPosition();
-	mat4 modification = worldMatrix * T(pos.x, pos.y, pos.z) * S(10.0, 10.0, 10.0);
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, modification.m);
-
-
-	// Draw
-	DrawModel(e->getModel(), program, "in_Position", "in_Normal", "inTexCoord");
-
-}

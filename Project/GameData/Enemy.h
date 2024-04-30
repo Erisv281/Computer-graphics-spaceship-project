@@ -16,7 +16,9 @@ public:
     // Move to new position.
     void move(vec3 pos) override;
 
-    
+    // Draw
+     void draw(GLuint program, mat4 worldMatrix) override;
+
 
 };
 

@@ -17,10 +17,10 @@ void Bullet::draw(GLuint program, mat4 worldMatrix){
     // Movement
     move(vec3{1.0f, direction.y, direction.z});	// todo check later
 
-    // Set model-view matrix
-    mat4 total = worldMatrix * T(this->position.x, position.y, position.z) * S(2.0, 2.0, 2.0);
-    glUniformMatrix4fv(glGetUniformLocation(program, "model_view"), 1, GL_TRUE, total.m);
+    // Set model_world matrix
+    mat4 total = worldMatrix * T(position.x, position.y, position.z) * S(2.0, 2.0, 2.0);
+    glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, total.m);
 
-    // Draw
+    // Draw model
     DrawModel(model, program, "in_Position", "in_Normal", "inTexCoord");
 }

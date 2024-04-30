@@ -48,7 +48,7 @@ void Spaceship::shoot(){
     this->shootTime = std::chrono::system_clock::now();
 }
 
-bool Spaceship::isShootCooldownWlapsed(double cooldown) const{
+bool Spaceship::isShootCooldownElapsed(double cooldown) const{
     auto currentTime = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration<double>(currentTime - shootTime).count();
     return elapsed >= cooldown;
@@ -62,4 +62,23 @@ vec3 Spaceship::getCrosshairPosition(){
     pos.x += 3.0f;
 	pos.y += 15.0f;
     return pos;
+}
+
+
+// Draw
+void Spaceship::draw(GLuint program, mat4 worldMatrix){
+    glUseProgram(program);
+
+	// If spaceship is shooting and time has elapsed, then allow shooting again. 
+	if (isShooting && isShootCooldownElapsed(SHOOTING_TIME)){
+		setIsShooting(false);
+	}
+
+	// Set Model-world matrix
+	mat4 total = worldMatrix * T(position.x, position.y, position.z) * Rx(rotAngleX) * Rz(rotAngleZ) * S(1.0, 1.0, 1.0);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, total.m);
+
+	// Draw
+	DrawModel(model, program, "in_Position", "in_Normal", "inTexCoord");
+
 }

@@ -17,6 +17,9 @@ private:
     float rotAngleX{0.0f};
     float rotAngleZ{0.0f};
 
+    // Constants
+    const double SHOOTING_TIME = 2.0;
+
 public:
     // Constructors
     Spaceship();
@@ -44,10 +47,13 @@ public:
     void shoot();
 
     // Check if cooldown has passed. 
-    bool isShootCooldownWlapsed(double cooldown) const;
+    bool isShootCooldownElapsed(double cooldown) const;
 
     // Get the crosshair position
     vec3 getCrosshairPosition();
+
+    // Draw
+    void draw(GLuint program, mat4 worldMatrix) override;
     
 
 };
