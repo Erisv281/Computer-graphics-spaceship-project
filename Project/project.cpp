@@ -38,7 +38,7 @@ Model* crosshairModel;
 Model* skybox;
 
 // Tex references
-GLuint skyBoxTex;	// 0
+GLuint skyBoxTex, texEnemy;	// 0
 
 // GameData
 Spaceship spaceship;
@@ -155,7 +155,7 @@ void loadModels(){
 	spaceshipModel = LoadModel("../Models/teapot.obj");
 	bulletModel = LoadModel("../Models/groundsphere.obj");
 	enemyModel = LoadModel("../Models/teddy.obj");
-	skybox = LoadModelPlus("../Models/labskybox.obj");	
+	skybox = LoadModelPlus("../Models/labskybox2.obj");	
 
 	// From https://www.cgtrader.com/items/92541/download-page
 	crosshairModel = LoadModel("../Models/crosshair.obj");
@@ -167,6 +167,7 @@ void loadModels(){
 void initTextures(){
 	// Load textures
 	LoadTGATextureSimple("../Models/cloud-landscape.tga", &skyBoxTex);
+	LoadTGATextureSimple("../Models/Textures/stone4_b.tga", &texEnemy);
 
 	// todo add more textures here. 
 
@@ -174,6 +175,11 @@ void initTextures(){
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, skyBoxTex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+	// Tex 1 for enemies
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, texEnemy);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
 
 }
 
@@ -422,7 +428,7 @@ void display(void)
 
 
 	// Draw the world
-	drawWorld();
+	//drawWorld();
 
 	// Draw enemies
 	for (Enemy* e : enemies){

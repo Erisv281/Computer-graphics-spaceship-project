@@ -2,7 +2,12 @@
 
 out vec4 out_Color;
 
+
+// Ins
 in vec3 exNormal;
+in vec2 texCoord;
+
+uniform sampler2D texUnit;
 
 const float kd = 0.7f;
 
@@ -17,5 +22,6 @@ void main(void)
 	diffuse = max(0.0, diffuse); // No negative light
 
 
-	out_Color = vec4(diffuse, diffuse, diffuse, 1.0f);
+	//out_Color = vec4(diffuse, diffuse, diffuse, 1.0f);
+	out_Color = texture(texUnit, texCoord) * diffuse;
 }
