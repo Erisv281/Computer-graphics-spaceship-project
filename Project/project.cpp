@@ -18,9 +18,8 @@
 
 
 
-// Lookat
-vec3 cameraPoint;
-vec3 lookatPoint;
+// Matrices
+vec3 cameraPoint, lookatPoint;
 mat4 look, worldMatrix, projectionMatrix;
 
 // Timer
@@ -36,34 +35,51 @@ Model* spaceshipModel;
 Model* bulletModel;
 Model* enemyModel;
 Model* crosshairModel;
+Model* skybox;
+
+// Tex references
+GLuint skyBoxTex;	// 0
 
 // GameData
 Spaceship spaceship;
 std::vector<Bullet*> bullets;
 std::vector<Enemy*> enemies;
 
-// Constants
-const float GAME_SPEED = 0.25f;
-const float MOVE_SPEED = 2.0f;
-const float BULLET_SPEED = 4.0f;
-
-// Shooting
-const int BULLET_DAMAGE = 1;
-
-// For enemies
-const std::pair<int, int> SPAWNER_COOLDOWN {7, 10};	
-const int ENEMY_HEALTH = 1;
-const int ENEMY_DAMAGE = 1;
-const int ENEMY_SPEED = 1.0f;
-std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
-float enemySpawnCooldown = 2.0f;
-
-
-// World
+// World constants
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
 const double SPAWN_DISTANCE = 40.0;
 
+// Speed constants
+const float GAME_SPEED = 0.25f;
+const float MOVE_SPEED = 2.0f;
+const float BULLET_SPEED = 4.0f;
+const float ENEMY_SPEED = 1.0f;
+
+// Bullets constants
+const int BULLET_DAMAGE = 1;
+
+// Enemies data
+const std::pair<int, int> SPAWNER_COOLDOWN {7, 10};	
+std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
+float enemySpawnCooldown = 2.0f;
+const int ENEMY_HEALTH = 1;
+const int ENEMY_DAMAGE = 1;
+
+
+// For movement controls
+float velocityY{0.0f};
+float velocityZ{0.0f};
+float rotAngleX{0.0f};
+float rotAngleZ{0.0f};
+vec3 nextPosition{0,0,0};
+
+// Programs
+GLuint program;
+GLuint programSky;
+
+
+// Todo might remove these
 
 #define kGroundSize 100.0f
 vec3 vertices[] =
@@ -101,30 +117,6 @@ vec3 colors[] =
 	0.0f, 0.0f, 1.0f
 };
 
-// For movement controls
-float velocityY{0.0f};
-float velocityZ{0.0f};
-float rotAngleX{0.0f};
-float rotAngleZ{0.0f};
-vec3 nextPosition{0,0,0};
-
-
-// Programs
-GLuint program;
-
-// Prototypes
-
-// Enemy spawn
-void enemySpawner();
-void spawnEnemy();
-
-// Draw functions
-void drawWorld();
-void drawCrossHair();
-
-// Collision functions
-void detectEnemySpaceshipCollision(Enemy* e, float radius);
-bool checkEnemyBulletCollision(Enemy* e, float radius);
 
 
 void handleControls(){
@@ -163,6 +155,7 @@ void loadModels(){
 	spaceshipModel = LoadModel("../Models/teapot.obj");
 	bulletModel = LoadModel("../Models/groundsphere.obj");
 	enemyModel = LoadModel("../Models/teddy.obj");
+	skybox = LoadModelPlus("../Models/labskybox.obj");	
 
 	// From https://www.cgtrader.com/items/92541/download-page
 	crosshairModel = LoadModel("../Models/crosshair.obj");
@@ -172,7 +165,16 @@ void loadModels(){
 }
 
 void initTextures(){
-	// todo add textures here. 
+	// Load textures
+	LoadTGATextureSimple("../Models/cloud-landscape.tga", &skyBoxTex);
+
+	// todo add more textures here. 
+
+	// Texture 0 for skybox
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, skyBoxTex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
 }
 
 
@@ -192,6 +194,7 @@ void GLInits(){
 // Init shaders and compile
 void loadShaders(){
     program = loadShaders("shader.vert", "shader.frag");
+	programSky = loadShaders("skybox.vert", "skybox.frag");	
 	printError("init shader");
 }
 
@@ -231,20 +234,106 @@ bool checkEnemyBulletCollision(Enemy* e, float radius){
 	return false;
 }
 
+// Todo maybe fix using other code
+void drawWorld(){
+	glUseProgram(program);
+	
+	// Set model-world matrix
+	mat4 total = worldMatrix * T(0.0f, 0, 0.0f) * S(500.0f, 0.1f, 500.0f);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, total.m);
+
+	// Draw model
+	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
+
+}
+
+// Draw the crosshair for the spaceship
+void drawCrossHair(){
+	// Set model-world matrix
+	vec3 posCross = spaceship.getCrosshairPosition();
+	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * S(0.2, 0.2, 0.2);
+
+	// Draw model
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, totalCross.m);
+	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
+}
+
+void spawnEnemy(){
+	// Set random position within 
+	vec3 pos = spaceship.getPosition();
+	pos.x += SPAWN_DISTANCE;
+	int randZ = rand() % 5 - 2;
+	int randY = rand() % 5 + 9;	// Todo might need fixing these random coordinates. 
+
+	//std::cout << randZ << ", " << randY << std::endl;
+
+	pos.y = randY;
+	pos.z = randZ;
+
+	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE));
+}
+
+// Enemy spawn:
+void enemySpawner(){
+	auto now = std::chrono::system_clock::now();
+	auto elapsed = std::chrono::duration<double>(now - enemySpawnTime).count();
+	if (elapsed >= enemySpawnCooldown){
+		// Spawn new Enemy and push back to vector. 
+		spawnEnemy();
+
+		// Reset cooldown and spawn time.
+		enemySpawnCooldown = rand() % SPAWNER_COOLDOWN.second + SPAWNER_COOLDOWN.first;
+		enemySpawnTime = std::chrono::system_clock::now();
+	}	
+}
+
+
+void drawSkybox(){
+	glUseProgram(programSky);	// Using another program
+
+	// Disable Z-buffer and backface culling
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+
+	mat4 newCamera = look;
+	newCamera.m[3] = 0;
+	newCamera.m[7] = 0;
+	newCamera.m[11] = 0;
+
+	mat4 total = newCamera * T(0, -0.3f, -0.5f);
+	
+	glUniformMatrix4fv(glGetUniformLocation(programSky, "model_world"), 1, GL_TRUE, worldMatrix.m);
+	glUniformMatrix4fv(glGetUniformLocation(programSky, "lookat"), 1, GL_TRUE, total.m);
+	glUniformMatrix4fv(glGetUniformLocation(programSky, "projection"), 1, GL_TRUE, projectionMatrix.m);
+	DrawModel(skybox, programSky, "in_Position", NULL, "inTexCoord");
+
+	// Enable back face culling and z-test
+	glEnable(GL_DEPTH_TEST);	
+	glEnable(GL_CULL_FACE);
+
+
+}
+
+
+
 
 
 void init(void)
 {
 	// Init models, textures, shaders
 	loadModels();
-	initTextures();
 	GLInits();
     loadShaders();	
 
 	// Projection
 	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, PROJECTION_NEAR, PROJECTION_FAR);
+	glUseProgram(programSky);
+	glUniformMatrix4fv(glGetUniformLocation(programSky, "projection"), 1, GL_TRUE, projectionMatrix.m);
+	glUniform1i(glGetUniformLocation(programSky, "texUnit"), 0);
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
+
+	initTextures();
 
 	// Lookat matrix init
 	cameraPoint = vec3(-20.0, 10.4, 0);
@@ -289,8 +378,8 @@ void display(void)
 	handleControls();
 	
 	// Set projection. 
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, worldMatrix.m);
 	glUseProgram(program);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, worldMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
 	// Frustum culling
@@ -326,6 +415,10 @@ void display(void)
 			it++;
 		}
 	}
+
+	// Draw skybox
+	drawSkybox();
+	glUseProgram(program);	// Back to using the initial program
 
 
 	// Draw the world
@@ -395,59 +488,6 @@ int main(int argc, char *argv[])
 
 
 
-// Enemy spawn:
-void enemySpawner(){
-	auto now = std::chrono::system_clock::now();
-	auto elapsed = std::chrono::duration<double>(now - enemySpawnTime).count();
-	if (elapsed >= enemySpawnCooldown){
-		// Spawn new Enemy and push back to vector. 
-		spawnEnemy();
-
-		// Reset cooldown and spawn time.
-		enemySpawnCooldown = rand() % SPAWNER_COOLDOWN.second + SPAWNER_COOLDOWN.first;
-		enemySpawnTime = std::chrono::system_clock::now();
-	}
-
-	
-}
-
-void spawnEnemy(){
-	// Set random position within 
-	vec3 pos = spaceship.getPosition();
-	pos.x += SPAWN_DISTANCE;
-	int randZ = rand() % 5 - 2;
-	int randY = rand() % 5 + 9;	// Todo might need fixing these random coordinates. 
-
-	//std::cout << randZ << ", " << randY << std::endl;
-
-	pos.y = randY;
-	pos.z = randZ;
-
-	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE));
-}
 
 
-// Todo maybe fix using other code
-void drawWorld(){
-	glUseProgram(program);
-	
-	// Set model-world matrix
-	mat4 total = worldMatrix * T(0.0f, 0, 0.0f) * S(500.0f, 0.1f, 500.0f);
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, total.m);
-
-	// Draw model
-	DrawModel(world, program, "in_Position", "in_Normal", "inTexCoord");
-
-}
-
-// Draw the crosshair for the spaceship
-void drawCrossHair(){
-	// Set model-world matrix
-	vec3 posCross = spaceship.getCrosshairPosition();
-	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * S(0.2, 0.2, 0.2);
-
-	// Draw model
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, totalCross.m);
-	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
-}
 
