@@ -18,7 +18,7 @@ private:
     float rotAngleZ{0.0f};
 
     // Constants
-    const double SHOOTING_TIME = 2.0;
+    const double SHOOTING_TIME = 0.5;
 
 public:
     // Constructors

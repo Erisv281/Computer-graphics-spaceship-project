@@ -15,7 +15,7 @@ void Bullet::move(vec3 pos){
 
 void Bullet::draw(GLuint program, mat4 worldMatrix){
     // Movement
-    move(vec3{1.0f, direction.y, direction.z});	// todo check later
+    move(vec3{1.0f, direction.y, direction.z});	// todo check later 
 
     // Set model_world matrix
     mat4 total = worldMatrix * T(position.x, position.y, position.z) * S(2.0, 2.0, 2.0);

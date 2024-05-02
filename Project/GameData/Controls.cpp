@@ -7,16 +7,16 @@
 void handleInputsAngles(float& rotAngleX, float& rotAngleZ, vec3 spaceshipPos){
 
 	// Handle rotations
-	if (spaceshipPos.y < OFFSET_SCREEN_Y.second){   // todo fix these borders
+	if (!isHittingBoundaryUp(spaceshipPos)){
 		handleAcceleration(rotAngleZ, 'w', ANGULAR_ACCELERATION_Z, ANGULAR_FRICTION_ACC);
 	}
-	if (spaceshipPos.y > OFFSET_SCREEN_Y.first){
+	if (!isHittingBoundaryDown(spaceshipPos)){
 		handleAcceleration(rotAngleZ, 's', -ANGULAR_ACCELERATION_Z, ANGULAR_FRICTION_ACC);
 	}
-	if (spaceshipPos.z > OFFSET_SCREEN_Z.first){
+	if (!isHittingBoundaryLeft(spaceshipPos)){
 		handleAcceleration(rotAngleX, 'a', -ANGULAR_ACCELERATION_X, ANGULAR_FRICTION_ACC);
 	}
-	if (spaceshipPos.z < OFFSET_SCREEN_Z.second){
+	if (!isHittingBoundaryRight(spaceshipPos)){
 		handleAcceleration(rotAngleX, 'd', ANGULAR_ACCELERATION_X, ANGULAR_FRICTION_ACC);
 	}
 
@@ -40,7 +40,7 @@ void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPo
 	nextPosition = vec3{0,0,0};
 
 	// Move Up W
-	if (spaceshipPos.y < OFFSET_SCREEN_Y.second){
+	if (!isHittingBoundaryUp(spaceshipPos)){
 		handleAcceleration(velY, 'w', ACCELERATION_VERTICAL, FRICTION_COEFFICIENT_ACC);
 	}
 	else{
@@ -49,7 +49,7 @@ void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPo
 
 
 	// Move Down S
-	if (spaceshipPos.y > OFFSET_SCREEN_Y.first){
+	if (!isHittingBoundaryDown(spaceshipPos)){
 		handleAcceleration(velY, 's', -ACCELERATION_VERTICAL, FRICTION_COEFFICIENT_ACC);
 	}
 	else{
@@ -58,7 +58,7 @@ void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPo
 	
 
 	// Move Left A
-	if (spaceshipPos.z > OFFSET_SCREEN_Z.first){
+	if (!isHittingBoundaryLeft(spaceshipPos)){
 		handleAcceleration(velZ, 'a', -ACCELERATION_HORIZONTAL, FRICTION_COEFFICIENT_ACC);		
 	}
 	else{
@@ -66,7 +66,7 @@ void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPo
 	}
 
 	// Move Right D
-	if (spaceshipPos.z < OFFSET_SCREEN_Z.second){
+	if (!isHittingBoundaryRight(spaceshipPos)){
 		handleAcceleration(velZ, 'd', ACCELERATION_HORIZONTAL, FRICTION_COEFFICIENT_ACC);	
 	}
 	else{
@@ -107,7 +107,26 @@ void handleDeacceleration(float& movement, char key1, char key2, float friction)
 }
 
 
-// rotAngleZ for rotating the direction y and rotAngleX for rotating the direction Z. 
+// Rotate in the y direction depending on the value of rotAngleZ
+// And rotate in the opposite of rotAngleX in regards to the z-axis.  
 vec3 calculateBulletDirection(float& rotAngleZ, float& rotAngleX){
-	return vec3(0, rotAngleZ, rotAngleX);
+	return vec3(0, rotAngleZ, -rotAngleX);
+}
+
+
+// Boundary checks
+bool isHittingBoundaryUp(vec3 const pos){
+	return pos.y >= OFFSET_SCREEN_Y.second;
+}
+
+bool isHittingBoundaryDown(vec3 const pos){
+	return pos.y <= OFFSET_SCREEN_Y.first;
+}
+
+bool isHittingBoundaryRight(vec3 const pos){
+	return pos.z >= OFFSET_SCREEN_Z.second;
+}
+
+bool isHittingBoundaryLeft(vec3 const pos){
+	return pos.z <= OFFSET_SCREEN_Z.first;	// 
 }

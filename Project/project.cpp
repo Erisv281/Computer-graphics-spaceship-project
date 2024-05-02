@@ -54,7 +54,7 @@ const double SPAWN_DISTANCE = 40.0;
 // Speed constants
 const float GAME_SPEED = 0.25f;
 const float MOVE_SPEED = 2.0f;
-const float BULLET_SPEED = 4.0f;
+const float BULLET_SPEED = 10.0f;
 const float ENEMY_SPEED = 1.0f;
 
 // Bullets constants
@@ -79,7 +79,6 @@ vec3 nextPosition{0,0,0};
 GLuint program;
 GLuint programSky;
 
-// Testing
 int score = 0;
 
 
@@ -122,8 +121,7 @@ void loadModels(){
 	// From https://www.cgtrader.com/items/92541/download-page
 	crosshairModel = LoadModel("../Models/crosshair.obj");
 
-	
-	// Todo add more models here
+
 }
 
 void initTextures(){
@@ -132,10 +130,6 @@ void initTextures(){
 	LoadTGATextureSimple("../Models/Textures/stone4_b.tga", &texEnemy);
 	LoadTGATextureSimple("../Models/Textures/kt_rot_2.tga", &texSpaceship);
 	LoadTGATextureSimple("../Models/Textures/kt_stone03.tga", &texBullet);
-
-	
-
-	// todo add more textures here. 
 
 	// Texture 0 for skybox
 	glActiveTexture(GL_TEXTURE0);
@@ -186,7 +180,7 @@ void detectEnemySpaceshipCollision(Enemy* e, float radius){
 	vec3 diff;
 	diff = spaceship.getPosition() - e->getPosition(); // Position difference
 
-	std::cout << Norm(diff) << std::endl;
+	//std::cout << Norm(diff) << std::endl;
 
 	if (Norm(diff) < radius) // Close enough to collide? Using Euclidian distance. 
 	{
@@ -221,7 +215,7 @@ bool checkEnemyBulletCollision(Enemy* e, float radius){
 void drawCrossHair(){
 	// Set model-world matrix
 	vec3 posCross = spaceship.getCrosshairPosition();
-	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * S(0.2, 0.2, 0.2);
+	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * Rx(rotAngleX) * Rz(rotAngleZ) * S(0.75, 0.75, 0.75);
 
 	// Draw model
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, totalCross.m);
@@ -232,10 +226,10 @@ void spawnEnemy(){
 	// Set random position within 
 	vec3 pos = spaceship.getPosition();
 	pos.x += SPAWN_DISTANCE;
-	int randZ = rand() % 5 - 2;
-	int randY = rand() % 5 + 9;	// Todo might need fixing these random coordinates. 
+	int randZ = rand() % 33 - 16;	// Todo when doing rotations, use the boundary methods. 
+	int randY = rand() % 35 - 9;	
 
-	//std::cout << randZ << ", " << randY << std::endl;
+	std::cout << randZ << ", " << randY << std::endl;
 
 	pos.y = randY;
 	pos.z = randZ;
@@ -280,8 +274,6 @@ void drawSkybox(){
 	// Enable back face culling and z-test
 	glEnable(GL_DEPTH_TEST);	
 	glEnable(GL_CULL_FACE);
-
-
 }
 
 
@@ -295,8 +287,6 @@ void setFont(std::string s, int width, int height){
 	char* text = const_cast<char*>(pchar);
 	sfDrawString(width, height, text);
 }
-
-
 
 
 
@@ -367,7 +357,10 @@ void display(void)
 	// Frustum culling
 	frustumCulling.updatePlanes(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
-	// Todo bind textures here. 
+	// Set spaceship movement and rotation.
+	spaceship.move(nextPosition);
+	spaceship.setRotAngleX(rotAngleX);
+	spaceship.setRotAngleZ(rotAngleZ);
 
 	
 	// Check collision for each enemy between near frustum plane, spaceship and bullets. 
@@ -417,15 +410,12 @@ void display(void)
 	}
 
 
-	// Set spaceship movement and rotation.
-	spaceship.move(nextPosition);
-	spaceship.setRotAngleX(rotAngleX);
-	spaceship.setRotAngleZ(rotAngleZ);
+	
 
 	// Draw spaceship and crosshair
+	drawCrossHair();
 	glActiveTexture(GL_TEXTURE2);
 	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
-	drawCrossHair();
 	spaceship.draw(program, worldMatrix);
 
 
