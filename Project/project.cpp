@@ -100,7 +100,7 @@ void handleControls(){
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
 		spaceship.shoot();
 		vec3 bullPos = calculateBulletDirection(rotAngleZ, rotAngleX);
-		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, bullPos));
+		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, 2.0f, bullPos));
 	}
 
 	// Setting lookat(world-view) matrix here
@@ -175,12 +175,13 @@ void loadShaders(){
 }
 
 
-// Based on collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
-void detectEnemySpaceshipCollision(Enemy* e, float radius){
-	vec3 diff;
-	diff = spaceship.getPosition() - e->getPosition(); // Position difference
 
-	//std::cout << Norm(diff) << std::endl;
+// Based on collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
+void detectEnemySpaceshipCollision(Enemy* e){
+	vec3 diff = spaceship.getCenterPosition() - e->getCenterPosition(); // Center position difference
+	float radius = spaceship.getRadius() + e->getRadius();	
+
+	std::cout << Norm(diff) << std::endl;
 
 	if (Norm(diff) < radius) // Close enough to collide? Using Euclidian distance. 
 	{
@@ -189,11 +190,12 @@ void detectEnemySpaceshipCollision(Enemy* e, float radius){
 }
 
 // Check if this enemy collide with bullet, if so then return true. 
-bool checkEnemyBulletCollision(Enemy* e, float radius){
+bool checkEnemyBulletCollision(Enemy* e){
 
 	for (int i = 0; i < bullets.size(); ++i) {
 		Bullet* b = bullets[i];
-		vec3 diff = b->getPosition() - e->getPosition(); // Position difference
+		vec3 diff = b->getCenterPosition() - e->getCenterPosition(); // Position center difference
+		float radius = b->getRadius() + e->getRadius();	
 
 		if (Norm(diff) < radius) {
 			// Enemy takes damage. 
@@ -234,7 +236,7 @@ void spawnEnemy(){
 	pos.y = randY;
 	pos.z = randZ;
 
-	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE));
+	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE, 9.0f));
 }
 
 // Enemy spawn:
@@ -319,7 +321,7 @@ void init(void)
 	worldMatrix = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0);
+	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0, 5.0f);
 
 	// Enemies
 	enemySpawnTime = std::chrono::system_clock::now();
@@ -368,12 +370,13 @@ void display(void)
 		Enemy* e = *it;
 
 		// Check spaceship-Enemy collision
-		detectEnemySpaceshipCollision(e, 8.0f);	// Todo radius
+		detectEnemySpaceshipCollision(e);	// Spaceship radius 5, enemy radius 9
 
 		// Delete enemy if inside near plane or collide with bullets. 
-		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e, 4.0f)){
+		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e)){
 			delete e;
 			it = enemies.erase(it);
+			// todo bullet-enemy radius is 9 + 2
 		}
 		else{
 			it++;
@@ -401,6 +404,14 @@ void display(void)
 	for (Enemy* e : enemies){
 		mat4 rotation = ArbRotate(e->getPosition(), t*0.5f);
 		e->draw(program, worldMatrix * rotation);
+
+		// Testing sphere
+		float RAD = 9.0f;
+		mat4 test = worldMatrix * T(e->getCenterPosition().x, e->getCenterPosition().y, e->getCenterPosition().z) * S(RAD-2, RAD, RAD);
+		glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, test.m);
+
+		// Draw
+		DrawModel(bulletModel, program, "in_Position", "in_Normal", "inTexCoord");
 	}
 
 	// Draw bullets
@@ -419,6 +430,13 @@ void display(void)
 	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
 	spaceship.draw(program, worldMatrix);
 
+	// Testing sphere
+	float RAD2 = 5.0f;
+	mat4 test1 = worldMatrix * T(spaceship.getPosition().x, spaceship.getPosition().y - 2, spaceship.getPosition().z) * S(RAD2, RAD2, RAD2);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, test1.m);
+
+	// Draw
+	DrawModel(bulletModel, program, "in_Position", "in_Normal", "inTexCoord");
 
 
 	// UI Fonts for score and health

@@ -5,7 +5,7 @@
 
 // Constructors
 Enemy::Enemy() : Entity() {}
-Enemy::Enemy(Model* model, int health, float speed, vec3 position, int damage) : Entity(model, health, speed, position, damage) {}
+Enemy::Enemy(Model* model, int health, float speed, vec3 position, int damage, float radius) : Entity(model, health, speed, position, damage, radius) {}
 
 
 // Move along pos. 
@@ -23,4 +23,8 @@ void Enemy::draw(GLuint program, mat4 worldMatrix){
 
 	// Draw
 	DrawModel(model, program, "in_Position", "in_Normal", "inTexCoord");
+}
+
+vec3 Enemy::getCenterPosition(){
+	return vec3{position.x, position.y - 10.0f, position.z};
 }

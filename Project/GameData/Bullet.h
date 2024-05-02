@@ -13,13 +13,15 @@ private:
 public:
     // Constructors
     Bullet();
-    Bullet(Model* model, int health, float speed, vec3 position, int damage, vec3 direction);
+    Bullet(Model* model, int health, float speed, vec3 position, int damage, float radius, vec3 direction);
 
     // Getter
     inline vec3 getDirection() const { return this->direction; }
 
     void move(vec3 pos) override;
     void draw(GLuint program, mat4 worldMatrix) override;
+
+    vec3 getCenterPosition() override;
     
 
 };

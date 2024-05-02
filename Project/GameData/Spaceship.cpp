@@ -4,7 +4,7 @@
 
 // Constructors
 Spaceship::Spaceship() : Entity(), isShooting{false} {}
-Spaceship::Spaceship(Model* model, int health, float speed, vec3 position, int damage) : Entity(model, health, speed, position, damage), 
+Spaceship::Spaceship(Model* model, int health, float speed, vec3 position, int damage, float radius) : Entity(model, health, speed, position, damage, radius), 
                     isShooting{false} {}
 
 
@@ -81,4 +81,8 @@ void Spaceship::draw(GLuint program, mat4 worldMatrix){
 	// Draw
 	DrawModel(model, program, "in_Position", "in_Normal", "inTexCoord");
 
+}
+
+vec3 Spaceship::getCenterPosition(){
+	return vec3{position.x, position.y - 2.0f, position.z};
 }

@@ -20,11 +20,12 @@ protected:
     vec3 position{0, 0, 0};
     bool isDead{false};
     int damage{0};
+    float radius{0.0f};
 
 public:
     // Constructors
     Entity();
-    Entity(Model* model, int health, float speed, vec3 position, int damage);
+    Entity(Model* model, int health, float speed, vec3 position, int damage, float radius);
 
     // Destructor
     virtual ~Entity();
@@ -40,6 +41,7 @@ public:
     inline float getSpeed() const { return this->speed; }
     inline bool getIsDead() const { return this->isDead; }
     inline int getDamage() const { return this->damage; }
+    inline int getRadius() const { return this->radius; }
 
     // Setters
     void setHealth(int health);
@@ -48,6 +50,7 @@ public:
     void setSpeed(float speed);
     void setIsDead(bool isDead);
     void setDamage(int damage);
+    void setRadius(float radius);
 
     // Reduce HP. If damage exceeds health then die. 
     void takeDamage(int damage);
@@ -60,6 +63,9 @@ public:
 
     // When no HP left, 
     virtual void die();
+
+    // Get the center position of model
+    virtual vec3 getCenterPosition();
 
 
 };

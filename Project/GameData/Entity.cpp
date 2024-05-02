@@ -5,11 +5,13 @@
 
 
 // Constructors
-Entity::Entity() : model{nullptr}, health{0}, speed{0.0}, position{vec3(0,0,0)}, damage{0} {}
-Entity::Entity(Model* model, int health, float speed, vec3 position, int damage) : model{new Model{*model}},
+Entity::Entity() : model{nullptr}, health{0}, speed{0.0}, position{vec3(0,0,0)}, damage{0}, radius{0.0f} {}
+Entity::Entity(Model* model, int health, float speed, vec3 position, int damage, float radius) : model{new Model{*model}},
                                                                     health{health},
                                                                     speed{speed},
-                                                                    position{position}, damage{damage} {}
+                                                                    position{position},
+                                                                    damage{damage},
+                                                                    radius{radius} {}
 
 // Destructor
 Entity::~Entity(){
@@ -25,6 +27,7 @@ Entity::Entity(const Entity& other){
     this->speed = other.speed;
     this->position = other.position;
     this->damage = other.damage;
+    this->radius = other.radius;
 }
 
 // copy assign operator
@@ -39,6 +42,7 @@ Entity& Entity::operator=(const Entity& other){
     std::swap(this->speed, temp.speed);
     std::swap(this->position, temp.position);
     std::swap(this->damage, temp.damage);
+    std::swap(this->radius, temp.radius);
 
     return *this;
 }
@@ -64,6 +68,9 @@ void Entity::setIsDead(bool isDead){
 void Entity::setDamage(int damage){
     this->damage = damage;
 }
+void Entity::setRadius(float radius){
+    this->radius = radius;
+}
 
 // Decrease health from damage. 
 void Entity::takeDamage(int damage){
@@ -83,6 +90,10 @@ void Entity::move(vec3 pos){
 }
 
 void Entity::draw(GLuint program, mat4 worldMatrix){
+    // Placeholder
+}
+
+vec3 Entity::getCenterPosition(){
     // Placeholder
 }
 

@@ -11,13 +11,15 @@ class Enemy : public Entity{
 public:
     // Constructors
     Enemy();
-    Enemy(Model* model, int health, float speed, vec3 position, int damage);
+    Enemy(Model* model, int health, float speed, vec3 position, int damage, float radius);
 
     // Move to new position.
     void move(vec3 pos) override;
 
     // Draw
-     void draw(GLuint program, mat4 worldMatrix) override;
+    void draw(GLuint program, mat4 worldMatrix) override;
+
+    vec3 getCenterPosition() override;
 
 
 };

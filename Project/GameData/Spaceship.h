@@ -23,7 +23,7 @@ private:
 public:
     // Constructors
     Spaceship();
-    Spaceship(Model* model, int health, float speed, vec3 position, int damage);
+    Spaceship(Model* model, int health, float speed, vec3 position, int damage, float radius);
 
     // Copy and assign constructors
     Spaceship(const Spaceship& other);
@@ -54,6 +54,8 @@ public:
 
     // Draw
     void draw(GLuint program, mat4 worldMatrix) override;
+
+    virtual vec3 getCenterPosition() override;
     
 
 };

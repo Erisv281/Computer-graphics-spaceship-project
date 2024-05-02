@@ -3,7 +3,7 @@
 
 // Constructors
 Bullet::Bullet() : Entity() {this->direction = vec3{0,0,0};}
-Bullet::Bullet(Model* model, int health, float speed, vec3 position, int damage, vec3 direction) : Entity(model, health, speed, position, damage) {
+Bullet::Bullet(Model* model, int health, float speed, vec3 position, int damage, float radius, vec3 direction) : Entity(model, health, speed, position, damage, radius) {
     this->direction = direction;
 }
 
@@ -23,4 +23,9 @@ void Bullet::draw(GLuint program, mat4 worldMatrix){
 
     // Draw model
     DrawModel(model, program, "in_Position", "in_Normal", "inTexCoord");
+}
+
+
+vec3 Bullet::getCenterPosition(){
+    return vec3{position.x, position.y, position.z};
 }
