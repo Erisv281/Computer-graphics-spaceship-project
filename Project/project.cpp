@@ -49,19 +49,19 @@ std::vector<Enemy*> enemies;
 // World constants
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
-const double SPAWN_DISTANCE = 40.0;
+const double SPAWN_DISTANCE = 80.0;
 
 // Speed constants
 const float GAME_SPEED = 0.25f;
 const float MOVE_SPEED = 2.0f;
 const float BULLET_SPEED = 10.0f;
-const float ENEMY_SPEED = 1.0f;
+const float ENEMY_SPEED = 0.7f;
 
 // Bullets constants
 const int BULLET_DAMAGE = 1;
 
 // Enemies data
-const std::pair<int, int> SPAWNER_COOLDOWN {7, 10};	
+const std::pair<int, int> SPAWNER_COOLDOWN {2, 5};	
 std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
 float enemySpawnCooldown = 2.0f;
 const int ENEMY_HEALTH = 1;
@@ -395,11 +395,12 @@ void display(void)
 	drawSkybox();
 	glUseProgram(program);	// Back to using the initial program
 
-	// Draw enemies
+	// Draw enemies, rotating around their arbitrary axis
 	glActiveTexture(GL_TEXTURE1);	
 	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
 	for (Enemy* e : enemies){
-		e->draw(program, worldMatrix);
+		mat4 rotation = ArbRotate(e->getPosition(), t*0.5f);
+		e->draw(program, worldMatrix * rotation);
 	}
 
 	// Draw bullets
