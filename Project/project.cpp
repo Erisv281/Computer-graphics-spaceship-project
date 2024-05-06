@@ -4,7 +4,7 @@
 // Includes
 #define MAIN
 #include <cmath>
-#include <cstdlib> // For random
+#include <cstdlib>
 #include <algorithm>
 #include <vector>
 #include <csignal>
@@ -47,31 +47,38 @@ std::vector<Bullet*> bullets;
 std::vector<Enemy*> enemies;
 
 // Game states
-bool isPlaying = true;
-bool enableEnemySpawn = true;
-bool enableInfiniteHealth = false;
-bool enableShowCollisions = false;
+bool isPlaying{true};
+bool enableEnemySpawn{true};
+bool enableInfiniteHealth{false};
+bool enableShowCollisions{false};
 
 // World constants
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
 const double SPAWN_DISTANCE = 80.0;
 
-// Speed constants
-const float GAME_SPEED = 0.25f;
-const float MOVE_SPEED = 2.0f;
-const float BULLET_SPEED = 10.0f;
-const float ENEMY_SPEED = 0.7f;
+// Spaceship constants
+const int SPACESHIP_MAX_HEALTH = 10;
+const float SPACESHIP_RADIUS = 5.0f;
+const float SPACESHIP_SPEED = 2.0f;
 
-// Bullets constants
+// Bullet constants
+const int BULLET_MAX_HEALTH = 1;
+const float BULLET_RADIUS = 2.0f;
+const float BULLET_SPEED = 10.0f;
 const int BULLET_DAMAGE = 1;
 
-// Enemies data
+// Enemy constants
+const int ENEMY_MAX_HEALTH = 1;
+const float ENEMY_RADIUS = 9.0f;
+const float ENEMY_SPEED = 0.7f;
+const int ENEMY_DAMAGE = 1;
+
+// Other Gamedata related
+const float GAME_SPEED = 0.25f;
 const std::pair<int, int> SPAWNER_COOLDOWN {2, 5};	
 std::chrono::time_point<std::chrono::system_clock> enemySpawnTime;
 float enemySpawnCooldown = 2.0f;
-const int ENEMY_HEALTH = 1;
-const int ENEMY_DAMAGE = 1;
 
 
 // For movement controls
@@ -81,7 +88,7 @@ float rotAngleX{0.0f};
 float rotAngleZ{0.0f};
 vec3 nextPosition{0,0,0};
 
-// Programs
+// Shader programs
 GLuint program;
 GLuint programSky;
 
@@ -89,8 +96,95 @@ GLuint programSky;
 int score = 0;
 int highScore = 0;
 
+// Function prototypes:
+void switchEnemySpawn(bool status);
+void loseGame();
+void resetGame();
+void keyboard(unsigned char c, int x, int y);
+void handleSpaceshipControls();
+void loadModels();
+void initTextures();
+void GLInits();
+void loadShaders();
+void detectEnemySpaceshipCollision(Enemy* e);
+bool checkEnemyBulletCollision(Enemy* e);
+void drawCrossHair();
+void spawnEnemy();
+void enemySpawner();
+void drawSkybox();
+void setFont(std::string s, int width, int height);
+void displayCollisionBorders(Entity* e);
+void checkAllEnemiesCollision();
+void checkAllBulletCollision();
 
-// Switch the spawn status and removes all enemies
+// Initialize GL information
+void GLInits(){
+	glClearColor(0.2,0.2,0.5,0);
+
+	// Enable Z-buffer and culling
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+
+	printError("GL inits");
+}
+
+
+// Load all models
+void loadModels(){
+
+	// Models from Ingemar Ragnemalm
+	spaceshipModel = LoadModel("../Models/teapot.obj");
+	bulletModel = LoadModel("../Models/groundsphere.obj");
+	enemyModel = LoadModel("../Models/teddy.obj");
+	skybox = LoadModelPlus("../Models/labskybox.obj");	
+
+	// Model from https://www.cgtrader.com/items/92541/download-page
+	crosshairModel = LoadModel("../Models/crosshair.obj");
+}
+
+
+// Load all textures used and connect to its texture unit. 
+void initTextures(){
+	
+	// Load .tga files
+	LoadTGATextureSimple("../Textures/cloud-landscape.tga", &skyBoxTex);
+	LoadTGATextureSimple("../Textures/stone4_b.tga", &texEnemy);
+	LoadTGATextureSimple("../Textures/kt_rot_2.tga", &texSpaceship);
+	LoadTGATextureSimple("../Textures/kt_stone03.tga", &texBullet);
+
+	// Texture 0 for skybox
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, skyBoxTex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+	// Texture 1 for enemies
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, texEnemy);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
+
+	// Texture 2 for spaceship
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, texSpaceship);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
+
+	// Texture 3 for bullet
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, texBullet);
+	glUniform1i(glGetUniformLocation(program, "texUnit"), 3);
+
+}
+
+
+// Initialize shaders and compile
+void loadShaders(){
+    program = loadShaders("../Shaders/shader.vert", "../Shaders/shader.frag");
+	programSky = loadShaders("../Shaders/skybox.vert", "../Shaders/skybox.frag");	
+
+	printError("init shader");
+}
+
+
+// Switches the spawn status and remove all enemies
 void switchEnemySpawn(bool status){
 	enableEnemySpawn = status;
 	for (Enemy* e : enemies){
@@ -100,7 +194,7 @@ void switchEnemySpawn(bool status){
 }
 
 
-// Pause game by disable enemy spawn and player. 
+// Pause game and set current high score. 
 void loseGame(){
 	isPlaying = false;
 
@@ -108,55 +202,56 @@ void loseGame(){
 	if (score > highScore){
 		highScore = score;
 	}
-
 }
 
 
+// UnPause game, re-enable enemy spawn and reset player and score data. 
 void resetGame(){
 	isPlaying = true;
 	switchEnemySpawn(true);
 
-	// Respawn spaceship
-	spaceship.setHealth(10);
+	// Respawn spaceship and score
+	spaceship.setHealth(SPACESHIP_MAX_HEALTH);
 	score = 0;
 }
 
 
 
 // Used for handling different game states
+// Press 'k' to enable/disable enemy spawn
+// Press 'l' for infinite spaceship health
+// Press 'j' for collision border visualization
+// Press 'p' to play game again
 void keyboard(unsigned char c, int x, int y){
 	switch (c)
 	{
-		// Enable/disable enemies by pressing k
 		case 'k':
 			if (isPlaying){
 				switchEnemySpawn(!enableEnemySpawn);
 			}
 			break;
 
-		// Infinite health by pressing l
 		case 'l':
 			enableInfiniteHealth = !enableInfiniteHealth;
 			break;
 
-		// Visualize collision borders
 		case 'j':
 			enableShowCollisions = !enableShowCollisions;
 			break;
-		// Play again
+
 		case 'p':
 			if (!isPlaying){
 				resetGame();
 			}
-			break;
-
-			
+			break;			
 	}
 }
 
 
 // Used for handling movement controls
 void handleSpaceshipControls(){
+
+	// Get current spaceship rotation
 	rotAngleX = spaceship.getRotAngleX();
 	rotAngleZ = spaceship.getRotAngleZ();
 
@@ -169,114 +264,50 @@ void handleSpaceshipControls(){
 	nextPosition.y += velocityY;
 	nextPosition.z += velocityZ;
 	
-
-    // If Pressing space and can shoot, then spawn bullet at spaceship position. 
+    // If Pressing space and can shoot
 	if (glutKeyIsDown(32) && !spaceship.getIsShooting()){
+		// Spawn bullet at spaceship position projected at its rotation.  
 		spaceship.shoot();
 		vec3 bullPos = calculateBulletDirection(rotAngleZ, rotAngleX);
-		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, 2.0f, bullPos));
+		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, BULLET_RADIUS, bullPos));
 	}
 
-
-	cameraPoint.x += GAME_SPEED;	// Game increase x-axis
-	
+	// Move camera along the game speed. 
+	cameraPoint.x += GAME_SPEED;	
 }
 
 
-
-void loadModels(){
-	spaceshipModel = LoadModel("../Models/teapot.obj");
-	bulletModel = LoadModel("../Models/groundsphere.obj");
-	enemyModel = LoadModel("../Models/teddy.obj");
-	skybox = LoadModelPlus("../Models/labskybox2.obj");	
-
-	// From https://www.cgtrader.com/items/92541/download-page
-	crosshairModel = LoadModel("../Models/crosshair.obj");
-
-
-}
-
-void initTextures(){
-	// Load textures
-	LoadTGATextureSimple("../Models/cloud-landscape.tga", &skyBoxTex);
-	LoadTGATextureSimple("../Models/Textures/stone4_b.tga", &texEnemy);
-	LoadTGATextureSimple("../Models/Textures/kt_rot_2.tga", &texSpaceship);
-	LoadTGATextureSimple("../Models/Textures/kt_stone03.tga", &texBullet);
-
-	// Texture 0 for skybox
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, skyBoxTex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
-	// Tex 1 for enemies
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, texEnemy);
-	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
-
-	// Tex 2 for spaceship
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, texSpaceship);
-	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
-
-	// Tex 3 for bullet
-	glActiveTexture(GL_TEXTURE3);
-	glBindTexture(GL_TEXTURE_2D, texBullet);
-	glUniform1i(glGetUniformLocation(program, "texUnit"), 3);
-
-}
-
-
-
-// Init stuff
-void GLInits(){
-    //dumpInfo();
-	glClearColor(0.2,0.2,0.5,0);
-
-	// Enable Z-buffer and culling
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-
-	printError("GL inits");
-}
-
-// Init shaders and compile
-void loadShaders(){
-    program = loadShaders("shader.vert", "shader.frag");
-	programSky = loadShaders("skybox.vert", "skybox.frag");	
-	printError("init shader");
-}
-
-
-
-// Based on collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
+// Handle collision between Spaceship-Enemy by checking the euclidian distance between them
+// Based on the code from collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
 void detectEnemySpaceshipCollision(Enemy* e){
-	vec3 diff = spaceship.getCenterPosition() - e->getCenterPosition(); // Center position difference
-	float radius = spaceship.getRadius() + e->getRadius();	
 
-	if (Norm(diff) < radius) // Close enough to collide? Using Euclidian distance. 
+	// Difference between center positions
+	vec3 diff = spaceship.getCenterPosition() - e->getCenterPosition();
+	float totalRadius = spaceship.getRadius() + e->getRadius();	
+
+	// Close enough to collide? Using Euclidian distance. 
+	if (Norm(diff) < totalRadius) 
 	{
-		if (!enableInfiniteHealth){
-			// Spaceship takes damage and maybe destroyed. 
-			spaceship.takeDamage(e->getDamage());
-			if (spaceship.getIsDead()){
-				std::cout << "Spaceship down!\n";
-				loseGame();
-			}
-		}
+		if (enableInfiniteHealth) { return; }
 
-		
+		// Spaceship takes damage and maybe destroyed. 
+		spaceship.takeDamage(e->getDamage());
+		if (spaceship.getIsDead()){
+			loseGame();
+		}
 	}
 }
 
-// Check if this enemy collide with bullet, if so then return true. 
+// Check if Enemy e collide with any bullet, if so then return true. 
 bool checkEnemyBulletCollision(Enemy* e){
+	for (size_t i = 0; i < bullets.size(); ++i) {
 
-	for (int i = 0; i < bullets.size(); ++i) {
+		// Difference between center positions
 		Bullet* b = bullets[i];
-		vec3 diff = b->getCenterPosition() - e->getCenterPosition(); // Position center difference
-		float radius = b->getRadius() + e->getRadius();	
+		vec3 diff = b->getCenterPosition() - e->getCenterPosition();
+		float totalRadius = b->getRadius() + e->getRadius();	
 
-		if (Norm(diff) < radius) {
+		if (Norm(diff) < totalRadius) {
 			// Enemy takes damage. 
 			e->takeDamage(b->getDamage());
 
@@ -295,34 +326,65 @@ bool checkEnemyBulletCollision(Enemy* e){
 }
 
 
-// Draw the crosshair for the spaceship
-void drawCrossHair(){
-	// Set model-world matrix
-	vec3 posCross = spaceship.getCrosshairPosition();
-	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * Rx(rotAngleX) * Rz(rotAngleZ) * S(0.75, 0.75, 0.75);
-
-	// Draw model
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, totalCross.m);
-	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
+// Check collision for all bullets between bullets amd the far frustum plane. 
+// If collision occur, then remove the bullet. 
+void checkAllBulletCollision(){
+	for (auto it = bullets.begin(); it != bullets.end();) {
+		Bullet* bullet = *it;
+		if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 40.0f)){
+			delete bullet;
+			it = bullets.erase(it);
+		}
+		else{
+			it++;
+		}
+	}
 }
 
+
+
+// Check collision for all enemies between the near frustum plane and bullets
+// If collision occur, then remove the enemy from the vector. 
+// Also, check the collision between the spaceship and all enemies. 
+void checkAllEnemiesCollision(){
+	for (auto it = enemies.begin(); it != enemies.end();) {
+		Enemy* e = *it;
+
+		// Check spaceship-Enemy collision
+		detectEnemySpaceshipCollision(e);
+
+		// Delete enemy if inside near plane or collide with bullets. 
+		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e)){
+			delete e;
+			it = enemies.erase(it);
+		}
+		else{
+			it++;
+		}
+	}
+}
+
+
+
+// Spawm an Enemy at random YZ position within screen borders
 void spawnEnemy(){
-	// Set random position within 
+
+	// Move away SPAWN_DISTANCE along x-axis. 
 	vec3 pos = spaceship.getPosition();
 	pos.x += SPAWN_DISTANCE;
-	int randZ = rand() % 33 - 16;	// Todo when doing rotations, use the boundary methods. 
-	int randY = rand() % 35 - 9;	
 
-	std::cout << randZ << ", " << randY << std::endl;
+	// Random YZ position within screen boundaries. 
+	pos.y = rand() % 33 - 16;
+	pos.z = rand() % 35 - 9;
 
-	pos.y = randY;
-	pos.z = randZ;
-
-	enemies.push_back(new Enemy(enemyModel, ENEMY_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE, 9.0f));
+	// Create new Enemy
+	enemies.push_back(new Enemy(enemyModel, ENEMY_MAX_HEALTH, ENEMY_SPEED, pos, ENEMY_DAMAGE, ENEMY_RADIUS));
 }
 
-// Enemy spawn:
+// Handle continous enemy spawns
+// By using a random cooldown timer, enemies are randomly spawned. 
 void enemySpawner(){
+	// Figure out if enough time has passed. 
 	auto now = std::chrono::system_clock::now();
 	auto elapsed = std::chrono::duration<double>(now - enemySpawnTime).count();
 	if (elapsed >= enemySpawnCooldown){
@@ -335,7 +397,19 @@ void enemySpawner(){
 	}	
 }
 
+// Draw the crosshair model for the spaceship
+void drawCrossHair(){
+	// Set model-world matrix
+	vec3 posCross = spaceship.getCrosshairPosition();
+	mat4 totalCross = worldMatrix * T(posCross.x, posCross.y, posCross.z) * Rz(90.0f) * Rx(rotAngleX) * Rz(rotAngleZ) * S(0.75, 0.75, 0.75);
 
+	// Draw model
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, totalCross.m);
+	DrawModel(crosshairModel, program, "in_Position", "in_Normal", "inTexCoord");
+}
+
+
+// Draw skybox
 void drawSkybox(){
 	// Using a seperate shader
 	glUseProgram(programSky);	
@@ -366,19 +440,21 @@ void drawSkybox(){
 }
 
 
+// Sets the text string s, at screen position given at width and heigh. 
 // This code is based on Ingemar Ragnemalm's simplefont.c
 void setFont(std::string s, int width, int height){
 	sfSetFont(-1);	// Default font
 	sfSetFontColor(1, 1, 1);
 
+	// use char const* as target type
 	// https://stackoverflow.com/questions/10847237/how-to-convert-from-int-to-char
-	char const *pchar = s.c_str();  //use char const* as target type
+	char const *pchar = s.c_str();  
 	char* text = const_cast<char*>(pchar);
 	sfDrawString(width, height, text);
 }
 
 
-// Draw bounding sphere around Entity
+// Draw bounding sphere around Entity e, representing the collision boundary
 void displayCollisionBorders(Entity* e){
 	
 	float radius = e->getRadius();
@@ -386,7 +462,7 @@ void displayCollisionBorders(Entity* e){
 	mat4 matrix = worldMatrix * T(center.x, center.y, center.z) * S(radius, radius, radius);
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, matrix.m);
 
-	// Draw
+	// Draw model
 	DrawModel(bulletModel, program, "in_Position", "in_Normal", "inTexCoord");
 }
 
@@ -394,41 +470,43 @@ void displayCollisionBorders(Entity* e){
 
 void init(void)
 {
-	// Init models, textures, shaders
+	// Init models, shaders
 	loadModels();
 	GLInits();
     loadShaders();	
 
-	// Projection
+	// Projection for skybox
 	projectionMatrix = frustum(-0.1, 0.1, -0.1, 0.1, PROJECTION_NEAR, PROJECTION_FAR);
 	glUseProgram(programSky);
 	glUniformMatrix4fv(glGetUniformLocation(programSky, "projection"), 1, GL_TRUE, projectionMatrix.m);
 	glUniform1i(glGetUniformLocation(programSky, "texUnit"), 0);
+
+	// Projection for other shader
 	glUseProgram(program);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
+	// Init textures
 	initTextures();
 
-	// Lookat matrix init
+	// Init Lookat matrix 
 	cameraPoint = vec3(-20.0, 10.4, 0);
 	lookatPoint = vec3(2.82, 0, 0);	
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 
-	// Frustum culling
-	frustumCulling = FrustumCulling(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
-
-	// Model-world matrix
+	// Init Model-world matrix
 	worldMatrix = IdentityMatrix();
 
-	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 10, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0, 5.0f);
+	// Init Frustum culling
+	frustumCulling = FrustumCulling(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
-	// Enemies
+	// Init Spaceship
+	spaceship = Spaceship(spaceshipModel, SPACESHIP_MAX_HEALTH, SPACESHIP_SPEED, vec3(0.0f, 0.0f, 0.0f), 0, SPACESHIP_RADIUS);
+
+	// Init Enemy spawner time clock
 	enemySpawnTime = std::chrono::system_clock::now();
 	srand(time(nullptr));	// Random number generator
 
 
-	
 	// End of upload of geometry
 	printError("init arrays");
 }
@@ -445,17 +523,17 @@ void display(void)
 	// Continous time t
 	t = (GLfloat)glutGet(GLUT_ELAPSED_TIME) / 1000;
 
+	// Control spaceship
 	if (isPlaying){
-		// Control spaceship
 		handleSpaceshipControls();
 	}
 	
-	// Set lookat matrix
+	// Update lookat matrix
 	glUseProgram(program);
 	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
 	glUniformMatrix4fv(glGetUniformLocation(program, "lookat"), 1, GL_TRUE, look.m);
 
-	// Set projection and model-to-world matrix
+	// Update projection and model-to-world matrix
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, worldMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
@@ -464,6 +542,7 @@ void display(void)
 	
 
 	// Use this font to show controls for resetting the game. 
+	// Otherwise display the rest
 	if (!isPlaying){
 		setFont("Restart game: P", 200, 200);
 	}
@@ -473,56 +552,29 @@ void display(void)
 			enemySpawner();
 		}
 
-		// Frustum culling
+		// Update Frustum culling
 		frustumCulling.updatePlanes(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
-		// Set spaceship movement and rotation.
+		// Update spaceship movement and rotation.
 		spaceship.move(nextPosition);
 		spaceship.setRotAngleX(rotAngleX);
 		spaceship.setRotAngleZ(rotAngleZ);
-
 		
-		// Check collision for each enemy between near frustum plane, spaceship and bullets. 
-		for (auto it = enemies.begin(); it != enemies.end();) {
-			Enemy* e = *it;
+		// Collision checks
+		checkAllEnemiesCollision();
+		checkAllBulletCollision();
 
-			// Check spaceship-Enemy collision
-			detectEnemySpaceshipCollision(e);
-
-			// Delete enemy if inside near plane or collide with bullets. 
-			if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e)){
-				delete e;
-				it = enemies.erase(it);
-			}
-			else{
-				it++;
-			}
-		}
-		// Check collision between each bullet and the far plane
-		for (auto it = bullets.begin(); it != bullets.end();) {
-			Bullet* bullet = *it;
-			if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 40.0f)){
-				delete bullet;
-				it = bullets.erase(it);
-			}
-			else{
-				it++;
-			}
-		}
-
-
-		// Draw enemies, rotating around their arbitrary axis
+		// Draw enemies
 		glActiveTexture(GL_TEXTURE1);	
 		glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
 		for (Enemy* e : enemies){
+			// Arbitrary rotation around its own axis
 			mat4 rotation = ArbRotate(e->getPosition(), t*0.5f);
 			e->draw(program, worldMatrix * rotation);
 
 			if (enableShowCollisions){
 				displayCollisionBorders(e);
 			}
-
-			
 		}
 
 		// Draw bullets
@@ -531,7 +583,6 @@ void display(void)
 		for (Bullet* b : bullets){
 			b->draw(program, worldMatrix);
 		}
-
 
 		// Draw spaceship and crosshair
 		drawCrossHair();
@@ -551,7 +602,6 @@ void display(void)
 		// UI for health
 		std::string healthString = enableInfiniteHealth ? "oo" : std::to_string(spaceship.getHealth());
 		setFont("Health: " + healthString, 100, 140);
-
 
 		// UI for controls
 		setFont("Move: WASD", 400, 100);
@@ -573,17 +623,18 @@ void display(void)
 	glutSwapBuffers();
 }
 
-// Freeing memory when exiting the window. 
+// Freeing memory of dynamic allocated objects when exiting the window by pressing [cntrl-C]. 
 void signalHandler(int signum){
 	for (Bullet* b : bullets){
 		delete b;
 	}
-	bullets.clear();	// Pointer invalidation clear
+	bullets.clear();
 
 	for (Enemy* e : enemies){
 		delete e;
 	}
 	enemies.clear();
+
 	exit(signum);
 }
 
@@ -598,11 +649,7 @@ int main(int argc, char *argv[])
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);	
 	glutInitWindowSize(600, 600);
 	glutCreateWindow ("Project");
-
-	// Animation
-	glutRepeatingTimer(150);
-
-	// Init
+	glutRepeatingTimer(150);	// Animation
 	glutDisplayFunc(display); 
 	glutKeyboardFunc(keyboard);	// Using keyboard
 	init ();
