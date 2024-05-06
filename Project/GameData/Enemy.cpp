@@ -9,13 +9,13 @@ Enemy::Enemy(Model* model, int health, float speed, vec3 position, int damage, f
 
 
 // Move along pos. 
-void Enemy::move(vec3 pos){
+void Enemy::move(vec3 const pos){
     this->position += pos;
 }
 
 void Enemy::draw(GLuint program, mat4 worldMatrix){
     // Move
-	move(vec3{-speed, 0, 0});	// Todo maybe add lerping here (not moving x, moving yz)
+	move(vec3{-speed, 0, 0});
 
 	// Set model-world matrix
 	mat4 total = worldMatrix * T(position.x, position.y, position.z) * S(10.0, 10.0, 10.0);
@@ -25,6 +25,6 @@ void Enemy::draw(GLuint program, mat4 worldMatrix){
 	DrawModel(model, program, "in_Position", "in_Normal", "inTexCoord");
 }
 
-vec3 Enemy::getCenterPosition(){
+vec3 Enemy::getCenterPosition() const {
 	return vec3{position.x, position.y - 10.0f, position.z};
 }

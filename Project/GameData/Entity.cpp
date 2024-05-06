@@ -7,11 +7,7 @@
 // Constructors
 Entity::Entity() : model{nullptr}, health{0}, speed{0.0}, position{vec3(0,0,0)}, damage{0}, radius{0.0f} {}
 Entity::Entity(Model* model, int health, float speed, vec3 position, int damage, float radius) : model{new Model{*model}},
-                                                                    health{health},
-                                                                    speed{speed},
-                                                                    position{position},
-                                                                    damage{damage},
-                                                                    radius{radius} {}
+                health{health}, speed{speed}, position{position}, damage{damage}, radius{radius} {}
 
 // Destructor
 Entity::~Entity(){
@@ -84,8 +80,7 @@ void Entity::takeDamage(int damage){
     
 }
 
-// Moving the position
-void Entity::move(vec3 pos){
+void Entity::move(vec3 const pos){
     // Placeholder. 
 }
 
@@ -93,8 +88,9 @@ void Entity::draw(GLuint program, mat4 worldMatrix){
     // Placeholder
 }
 
-vec3 Entity::getCenterPosition(){
+vec3 Entity::getCenterPosition() const{
     // Placeholder
+    return vec3{0,0,0};
 }
 
 

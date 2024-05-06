@@ -9,13 +9,13 @@ Bullet::Bullet(Model* model, int health, float speed, vec3 position, int damage,
 
 
 // Move continously along pos. 
-void Bullet::move(vec3 pos){
+void Bullet::move(vec3 const pos){
     this->position += pos * speed;
 }
 
 void Bullet::draw(GLuint program, mat4 worldMatrix){
     // Movement
-    move(vec3{1.0f, direction.y, direction.z});	// todo check later 
+    move(vec3{1.0f, direction.y, direction.z});
 
     // Set model_world matrix
     mat4 total = worldMatrix * T(position.x, position.y, position.z) * S(2.0, 2.0, 2.0);
@@ -26,6 +26,6 @@ void Bullet::draw(GLuint program, mat4 worldMatrix){
 }
 
 
-vec3 Bullet::getCenterPosition(){
+vec3 Bullet::getCenterPosition() const{
     return vec3{position.x, position.y, position.z};
 }

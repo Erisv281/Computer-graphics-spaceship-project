@@ -97,25 +97,31 @@ int score = 0;
 int highScore = 0;
 
 // Function prototypes:
+void GLInits();
+void loadModels();
+void initTextures();
+void loadShaders();
+
 void switchEnemySpawn(bool status);
 void loseGame();
 void resetGame();
 void keyboard(unsigned char c, int x, int y);
 void handleSpaceshipControls();
-void loadModels();
-void initTextures();
-void GLInits();
-void loadShaders();
-void detectEnemySpaceshipCollision(Enemy* e);
-bool checkEnemyBulletCollision(Enemy* e);
-void drawCrossHair();
-void spawnEnemy();
-void enemySpawner();
-void drawSkybox();
-void setFont(std::string s, int width, int height);
-void displayCollisionBorders(Entity* e);
+
+
 void checkAllEnemiesCollision();
 void checkAllBulletCollision();
+void detectEnemySpaceshipCollision(Enemy* const e);
+bool checkEnemyBulletCollision(Enemy* e);
+
+void spawnEnemy();
+void enemySpawner();
+
+void drawCrossHair();
+void drawSkybox();
+void setFont(std::string s, int width, int height);
+void displayCollisionBorders(Entity* const e);
+
 
 // Initialize GL information
 void GLInits(){
@@ -279,7 +285,7 @@ void handleSpaceshipControls(){
 
 // Handle collision between Spaceship-Enemy by checking the euclidian distance between them
 // Based on the code from collision2-surfaces-multiobj-little-city.c by Ingemar Ragnemalm
-void detectEnemySpaceshipCollision(Enemy* e){
+void detectEnemySpaceshipCollision(Enemy* const e){
 
 	// Difference between center positions
 	vec3 diff = spaceship.getCenterPosition() - e->getCenterPosition();
@@ -455,7 +461,7 @@ void setFont(std::string s, int width, int height){
 
 
 // Draw bounding sphere around Entity e, representing the collision boundary
-void displayCollisionBorders(Entity* e){
+void displayCollisionBorders(Entity* const e){
 	
 	float radius = e->getRadius();
 	vec3 center = e->getCenterPosition();
@@ -497,7 +503,7 @@ void init(void)
 	worldMatrix = IdentityMatrix();
 
 	// Init Frustum culling
-	frustumCulling = FrustumCulling(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
+	frustumCulling = FrustumCulling(cameraPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
 	// Init Spaceship
 	spaceship = Spaceship(spaceshipModel, SPACESHIP_MAX_HEALTH, SPACESHIP_SPEED, vec3(0.0f, 0.0f, 0.0f), 0, SPACESHIP_RADIUS);
@@ -553,7 +559,7 @@ void display(void)
 		}
 
 		// Update Frustum culling
-		frustumCulling.updatePlanes(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
+		frustumCulling.updatePlanes(cameraPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
 		// Update spaceship movement and rotation.
 		spaceship.move(nextPosition);

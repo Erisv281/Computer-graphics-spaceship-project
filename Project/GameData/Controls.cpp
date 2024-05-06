@@ -3,8 +3,10 @@
 #include "Controls.h"
 
 
-
-void handleInputsAngles(float& rotAngleX, float& rotAngleZ, vec3 spaceshipPos){
+// Handle the angular movement
+// Press WS to rotate up and down
+// Press AD to rotate left and right
+void handleInputsAngles(float& rotAngleX, float& rotAngleZ, vec3 const spaceshipPos){
 
 	// Handle rotations
 	if (!isHittingBoundaryUp(spaceshipPos)){
@@ -33,9 +35,10 @@ void handleInputsAngles(float& rotAngleX, float& rotAngleZ, vec3 spaceshipPos){
 	
 }
 
-// WS = Move up and down
-// AD = Move left and right
-void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPos){
+// Handle the movement
+// Press WS to move up and down
+// Press AD to move left and right
+void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 const spaceshipPos){
 	// Next position of spaceship. 
 	nextPosition = vec3{0,0,0};
 
@@ -88,7 +91,7 @@ void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPo
 
 
 
-
+// If pressing moveKey, then apply acceleration and friction to the movement. 
 void handleAcceleration(float& movement, char moveKey, float acceleration, float friction){
 	if (glutKeyIsDown(moveKey)){
 		movement += acceleration * friction;
@@ -96,7 +99,7 @@ void handleAcceleration(float& movement, char moveKey, float acceleration, float
 }
 
 
-// If not pressing either key1 nor key2. Then apply deacceleration friction to the data. 
+// If neither pressing either key1 nor key2. Then apply deacceleration friction to the movement. 
 void handleDeacceleration(float& movement, char key1, char key2, float friction){
 	if (!(glutKeyIsDown(key1) || glutKeyIsDown(key2))) {
 		movement *= friction;
@@ -107,11 +110,6 @@ void handleDeacceleration(float& movement, char key1, char key2, float friction)
 }
 
 
-// Rotate in the y direction depending on the value of rotAngleZ
-// And rotate in the opposite of rotAngleX in regards to the z-axis.  
-vec3 calculateBulletDirection(float& rotAngleZ, float& rotAngleX){
-	return vec3(0, rotAngleZ, -rotAngleX);
-}
 
 
 // Boundary checks
@@ -128,5 +126,13 @@ bool isHittingBoundaryRight(vec3 const pos){
 }
 
 bool isHittingBoundaryLeft(vec3 const pos){
-	return pos.z <= OFFSET_SCREEN_Z.first;	// 
+	return pos.z <= OFFSET_SCREEN_Z.first;
+}
+
+
+
+// Rotate in the y direction depending on the value of rotAngleZ
+// And rotate in the opposite of rotAngleX in regards to the z-axis.  
+vec3 calculateBulletDirection(float rotAngleZ, float rotAngleX){
+	return vec3(0, rotAngleZ, -rotAngleX);
 }

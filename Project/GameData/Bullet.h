@@ -1,4 +1,6 @@
 
+// This class override the Entity class and represents bullets shot from spaceship in the game. 
+// Has the additional parameter called direaction, which is used to project the bullet at correct direction. 
 
 #ifndef _BULLET
 #define _BULLET
@@ -18,10 +20,10 @@ public:
     // Getter
     inline vec3 getDirection() const { return this->direction; }
 
-    void move(vec3 pos) override;
+    // Overriden methods
+    void move(vec3 const pos) override;
     void draw(GLuint program, mat4 worldMatrix) override;
-
-    vec3 getCenterPosition() override;
+    vec3 getCenterPosition() const override;
     
 
 };

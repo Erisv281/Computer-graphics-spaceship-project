@@ -1,4 +1,9 @@
 
+// This class represents the playable spaceship in the game.
+
+// Has additional parameters for checking if the spaceship has fired shot aswell as the chooting time. 
+// It also has additional parameters for handling rotation along x and z axis. 
+// Use the method getCrosshairPosition() to retreive the crosshair position, position bullets are fired from. 
 
 #ifndef _SPACESHIP
 #define _SPACESHIP
@@ -38,10 +43,11 @@ public:
     void setRotAngleX(float angle);
     void setRotAngleZ(float angle);
     void setIsShooting(bool isShooting);
-    
 
-    // Move to new position.
-    void move(vec3 pos) override;
+    // Overriden methods.
+    void move(vec3 const pos) override;
+    void draw(GLuint program, mat4 worldMatrix) override;
+    vec3 getCenterPosition() const override;
 
     // Start timer for shooting. 
     void shoot();
@@ -50,13 +56,7 @@ public:
     bool isShootCooldownElapsed(double cooldown) const;
 
     // Get the crosshair position
-    vec3 getCrosshairPosition();
-
-    // Draw
-    void draw(GLuint program, mat4 worldMatrix) override;
-
-    virtual vec3 getCenterPosition() override;
-    
+    vec3 getCrosshairPosition() const;
 
 };
 

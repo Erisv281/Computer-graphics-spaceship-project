@@ -23,8 +23,7 @@ Spaceship& Spaceship::operator=(const Spaceship& other){
 }
 
 
-// Move to new position. Todo fix later
-void Spaceship::move(vec3 pos){
+void Spaceship::move(vec3 const pos){
     this->position += pos;
 }
 
@@ -42,12 +41,13 @@ void Spaceship::setIsShooting(bool isShooting){
 }
 
 
-// Shoot bullet
+// Set bullet shooting status and start timer. 
 void Spaceship::shoot(){
     this->isShooting = true;
     this->shootTime = std::chrono::system_clock::now();
 }
 
+// Return true if the elapsed time has passed. 
 bool Spaceship::isShootCooldownElapsed(double cooldown) const{
     auto currentTime = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration<double>(currentTime - shootTime).count();
@@ -57,7 +57,7 @@ bool Spaceship::isShootCooldownElapsed(double cooldown) const{
 
 
 // Returns the crosshair position by modifying xy position. 
-vec3 Spaceship::getCrosshairPosition(){
+vec3 Spaceship::getCrosshairPosition() const{
     vec3 pos = this->position;
     pos.x += 3.0f;
 	pos.y += 10.0f;
@@ -65,7 +65,6 @@ vec3 Spaceship::getCrosshairPosition(){
 }
 
 
-// Draw
 void Spaceship::draw(GLuint program, mat4 worldMatrix){
     glUseProgram(program);
 
@@ -83,6 +82,6 @@ void Spaceship::draw(GLuint program, mat4 worldMatrix){
 
 }
 
-vec3 Spaceship::getCenterPosition(){
+vec3 Spaceship::getCenterPosition() const{
 	return vec3{position.x, position.y - 2.0f, position.z};
 }

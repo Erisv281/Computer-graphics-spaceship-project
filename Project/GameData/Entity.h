@@ -1,4 +1,8 @@
 
+// This file represents the abstract class of entities in the game such as Spaceship, bullets, enemies. 
+// It consists of the health, speed, model, position, death-status, damage and radius of the entity. 
+// Use the method draw() to render this object. 
+// Override the method move() to relocate the object. 
 
 #ifndef _ENTITY
 #define _ENTITY
@@ -56,18 +60,16 @@ public:
     void takeDamage(int damage);
 
     // Move to new position.
-    virtual void move(vec3 pos);
+    virtual void move(vec3 const pos);
 
     // Draw function to new position.
     virtual void draw(GLuint program, mat4 worldMatrix);
 
-    // When no HP left, 
+    // When no HP left 
     virtual void die();
 
     // Get the center position of model
-    virtual vec3 getCenterPosition();
-
-
+    virtual vec3 getCenterPosition() const;
 };
 
 

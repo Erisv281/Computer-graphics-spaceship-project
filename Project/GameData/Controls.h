@@ -31,9 +31,9 @@ const float ANGULAR_FRICTION_DEC = 0.5f;
 const std::pair<int, int> OFFSET_SCREEN_Z {-16, 16};
 const std::pair<int, int> OFFSET_SCREEN_Y {-9, 25};
 
-void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 spaceshipPos);
+void handleInputs(float& velY, float& velZ, vec3& nextPosition, vec3 const spaceshipPos);
 
-void handleInputsAngles(float& rotAngleX, float& rotAngleZ, vec3 spaceshipPos);
+void handleInputsAngles(float& rotAngleX, float& rotAngleZ, vec3 const spaceshipPos);
 
 void handleDeacceleration(float& movement, char key1, char key2, float friction);
 
@@ -45,7 +45,7 @@ bool isHittingBoundaryDown(vec3 const pos);
 bool isHittingBoundaryRight(vec3 const pos);
 bool isHittingBoundaryLeft(vec3 const pos);
 
-
-vec3 calculateBulletDirection(float& rotAngleZ, float& rotAngleX);
+// Return the next bullet direction
+vec3 calculateBulletDirection(float rotAngleZ, float rotAngleX);
 
 #endif
