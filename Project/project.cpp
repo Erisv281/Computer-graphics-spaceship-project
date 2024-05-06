@@ -46,6 +46,12 @@ Spaceship spaceship;
 std::vector<Bullet*> bullets;
 std::vector<Enemy*> enemies;
 
+// Game states
+bool isPlaying = true;
+bool enableEnemySpawn = true;
+bool enableInfiniteHealth = false;
+bool enableShowCollisions = false;
+
 // World constants
 const double PROJECTION_FAR = 200.0;
 const double PROJECTION_NEAR = 0.1;
@@ -79,10 +85,78 @@ vec3 nextPosition{0,0,0};
 GLuint program;
 GLuint programSky;
 
+// Score system
 int score = 0;
+int highScore = 0;
 
 
-void handleControls(){
+// Switch the spawn status and removes all enemies
+void switchEnemySpawn(bool status){
+	enableEnemySpawn = status;
+	for (Enemy* e : enemies){
+		delete e;
+	}
+	enemies.clear();
+}
+
+
+// Pause game by disable enemy spawn and player. 
+void loseGame(){
+	isPlaying = false;
+
+	// Set high score
+	if (score > highScore){
+		highScore = score;
+	}
+
+}
+
+
+void resetGame(){
+	isPlaying = true;
+	switchEnemySpawn(true);
+
+	// Respawn spaceship
+	spaceship.setHealth(10);
+	score = 0;
+}
+
+
+
+// Used for handling different game states
+void keyboard(unsigned char c, int x, int y){
+	switch (c)
+	{
+		// Enable/disable enemies by pressing k
+		case 'k':
+			if (isPlaying){
+				switchEnemySpawn(!enableEnemySpawn);
+			}
+			break;
+
+		// Infinite health by pressing l
+		case 'l':
+			enableInfiniteHealth = !enableInfiniteHealth;
+			break;
+
+		// Visualize collision borders
+		case 'j':
+			enableShowCollisions = !enableShowCollisions;
+			break;
+		// Play again
+		case 'p':
+			if (!isPlaying){
+				resetGame();
+			}
+			break;
+
+			
+	}
+}
+
+
+// Used for handling movement controls
+void handleSpaceshipControls(){
 	rotAngleX = spaceship.getRotAngleX();
 	rotAngleZ = spaceship.getRotAngleZ();
 
@@ -103,11 +177,9 @@ void handleControls(){
 		bullets.push_back(new Bullet(bulletModel, 1, BULLET_SPEED, spaceship.getCrosshairPosition(), BULLET_DAMAGE, 2.0f, bullPos));
 	}
 
-	// Setting lookat(world-view) matrix here
-	cameraPoint.x += GAME_SPEED;	// Game increase x-axis
-	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
-	glUniformMatrix4fv(glGetUniformLocation(program, "lookat"), 1, GL_TRUE, look.m);
 
+	cameraPoint.x += GAME_SPEED;	// Game increase x-axis
+	
 }
 
 
@@ -181,11 +253,18 @@ void detectEnemySpaceshipCollision(Enemy* e){
 	vec3 diff = spaceship.getCenterPosition() - e->getCenterPosition(); // Center position difference
 	float radius = spaceship.getRadius() + e->getRadius();	
 
-	std::cout << Norm(diff) << std::endl;
-
 	if (Norm(diff) < radius) // Close enough to collide? Using Euclidian distance. 
 	{
-		std::cout << "Enemy spaceship collision!\n";
+		if (!enableInfiniteHealth){
+			// Spaceship takes damage and maybe destroyed. 
+			spaceship.takeDamage(e->getDamage());
+			if (spaceship.getIsDead()){
+				std::cout << "Spaceship down!\n";
+				loseGame();
+			}
+		}
+
+		
 	}
 }
 
@@ -204,6 +283,9 @@ bool checkEnemyBulletCollision(Enemy* e){
 			// Erase the bullet
 			delete b;
 			bullets.erase(bullets.begin() + i); 
+
+			// Increase game score
+			score += 10;
 
 			// Return death status
 			return e->getIsDead();
@@ -255,27 +337,32 @@ void enemySpawner(){
 
 
 void drawSkybox(){
-	glUseProgram(programSky);	// Using another program
+	// Using a seperate shader
+	glUseProgram(programSky);	
 
 	// Disable Z-buffer and backface culling
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 
+	// Nullify the translation part of the lookat matrix
 	mat4 newCamera = look;
 	newCamera.m[3] = 0;
 	newCamera.m[7] = 0;
 	newCamera.m[11] = 0;
-
 	mat4 total = newCamera * T(0, -0.3f, -0.5f);
 	
+	// Put matrix data to shaders and draw skybox
 	glUniformMatrix4fv(glGetUniformLocation(programSky, "model_world"), 1, GL_TRUE, worldMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(programSky, "lookat"), 1, GL_TRUE, total.m);
 	glUniformMatrix4fv(glGetUniformLocation(programSky, "projection"), 1, GL_TRUE, projectionMatrix.m);
 	DrawModel(skybox, programSky, "in_Position", NULL, "inTexCoord");
 
-	// Enable back face culling and z-test
+	// Re-enable back face culling and z-test
 	glEnable(GL_DEPTH_TEST);	
 	glEnable(GL_CULL_FACE);
+
+	// Reset to origin shader
+	glUseProgram(program);
 }
 
 
@@ -288,6 +375,19 @@ void setFont(std::string s, int width, int height){
 	char const *pchar = s.c_str();  //use char const* as target type
 	char* text = const_cast<char*>(pchar);
 	sfDrawString(width, height, text);
+}
+
+
+// Draw bounding sphere around Entity
+void displayCollisionBorders(Entity* e){
+	
+	float radius = e->getRadius();
+	vec3 center = e->getCenterPosition();
+	mat4 matrix = worldMatrix * T(center.x, center.y, center.z) * S(radius, radius, radius);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, matrix.m);
+
+	// Draw
+	DrawModel(bulletModel, program, "in_Position", "in_Normal", "inTexCoord");
 }
 
 
@@ -321,7 +421,7 @@ void init(void)
 	worldMatrix = IdentityMatrix();
 
 	// Spaceship
-	spaceship = Spaceship(spaceshipModel, 100, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0, 5.0f);
+	spaceship = Spaceship(spaceshipModel, 10, MOVE_SPEED, vec3(0.0f, 0.0f, 0.0f), 0, 5.0f);
 
 	// Enemies
 	enemySpawnTime = std::chrono::system_clock::now();
@@ -345,103 +445,127 @@ void display(void)
 	// Continous time t
 	t = (GLfloat)glutGet(GLUT_ELAPSED_TIME) / 1000;
 
-	// Enemy spawner handler
-	enemySpawner();
-
-	// Input handler
-	handleControls();
+	if (isPlaying){
+		// Control spaceship
+		handleSpaceshipControls();
+	}
 	
-	// Set projection. 
+	// Set lookat matrix
 	glUseProgram(program);
+	look = lookAtv(cameraPoint, cameraPoint + lookatPoint, vec3(0, 1, 0));
+	glUniformMatrix4fv(glGetUniformLocation(program, "lookat"), 1, GL_TRUE, look.m);
+
+	// Set projection and model-to-world matrix
 	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, worldMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_TRUE, projectionMatrix.m);
 
-	// Frustum culling
-	frustumCulling.updatePlanes(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
-
-	// Set spaceship movement and rotation.
-	spaceship.move(nextPosition);
-	spaceship.setRotAngleX(rotAngleX);
-	spaceship.setRotAngleZ(rotAngleZ);
-
-	
-	// Check collision for each enemy between near frustum plane, spaceship and bullets. 
-	for (auto it = enemies.begin(); it != enemies.end();) {
-		Enemy* e = *it;
-
-		// Check spaceship-Enemy collision
-		detectEnemySpaceshipCollision(e);	// Spaceship radius 5, enemy radius 9
-
-		// Delete enemy if inside near plane or collide with bullets. 
-		if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e)){
-			delete e;
-			it = enemies.erase(it);
-			// todo bullet-enemy radius is 9 + 2
-		}
-		else{
-			it++;
-		}
-	}
-	// Check collision between each bullet and the far plane
-	for (auto it = bullets.begin(); it != bullets.end();) {
-		Bullet* bullet = *it;
-		if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 40.0f)){
-			delete bullet;
-			it = bullets.erase(it);
-		}
-		else{
-			it++;
-		}
-	}
-
 	// Draw skybox
 	drawSkybox();
-	glUseProgram(program);	// Back to using the initial program
-
-	// Draw enemies, rotating around their arbitrary axis
-	glActiveTexture(GL_TEXTURE1);	
-	glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
-	for (Enemy* e : enemies){
-		mat4 rotation = ArbRotate(e->getPosition(), t*0.5f);
-		e->draw(program, worldMatrix * rotation);
-
-		// Testing sphere
-		float RAD = 9.0f;
-		mat4 test = worldMatrix * T(e->getCenterPosition().x, e->getCenterPosition().y, e->getCenterPosition().z) * S(RAD-2, RAD, RAD);
-		glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, test.m);
-
-		// Draw
-		DrawModel(bulletModel, program, "in_Position", "in_Normal", "inTexCoord");
-	}
-
-	// Draw bullets
-	glActiveTexture(GL_TEXTURE3);
-	glUniform1i(glGetUniformLocation(program, "texUnit"), 3);
-	for (Bullet* b : bullets){
-		b->draw(program, worldMatrix);
-	}
-
-
 	
 
-	// Draw spaceship and crosshair
-	drawCrossHair();
-	glActiveTexture(GL_TEXTURE2);
-	glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
-	spaceship.draw(program, worldMatrix);
+	// Use this font to show controls for resetting the game. 
+	if (!isPlaying){
+		setFont("Restart game: P", 200, 200);
+	}
+	else{
+		// Enemy spawner handler
+		if (enableEnemySpawn){
+			enemySpawner();
+		}
 
-	// Testing sphere
-	float RAD2 = 5.0f;
-	mat4 test1 = worldMatrix * T(spaceship.getPosition().x, spaceship.getPosition().y - 2, spaceship.getPosition().z) * S(RAD2, RAD2, RAD2);
-	glUniformMatrix4fv(glGetUniformLocation(program, "model_world"), 1, GL_TRUE, test1.m);
+		// Frustum culling
+		frustumCulling.updatePlanes(cameraPoint, cameraPoint + lookatPoint, PROJECTION_NEAR, PROJECTION_FAR);
 
-	// Draw
-	DrawModel(bulletModel, program, "in_Position", "in_Normal", "inTexCoord");
+		// Set spaceship movement and rotation.
+		spaceship.move(nextPosition);
+		spaceship.setRotAngleX(rotAngleX);
+		spaceship.setRotAngleZ(rotAngleZ);
+
+		
+		// Check collision for each enemy between near frustum plane, spaceship and bullets. 
+		for (auto it = enemies.begin(); it != enemies.end();) {
+			Enemy* e = *it;
+
+			// Check spaceship-Enemy collision
+			detectEnemySpaceshipCollision(e);
+
+			// Delete enemy if inside near plane or collide with bullets. 
+			if (frustumCulling.IsInsidePlane(frustumCulling.getNearPlane(), e->getPosition(), 1.0f) || checkEnemyBulletCollision(e)){
+				delete e;
+				it = enemies.erase(it);
+			}
+			else{
+				it++;
+			}
+		}
+		// Check collision between each bullet and the far plane
+		for (auto it = bullets.begin(); it != bullets.end();) {
+			Bullet* bullet = *it;
+			if (frustumCulling.IsInsidePlane(frustumCulling.getFarPlane(), bullet->getPosition(), 40.0f)){
+				delete bullet;
+				it = bullets.erase(it);
+			}
+			else{
+				it++;
+			}
+		}
 
 
-	// UI Fonts for score and health
-	setFont("Score: " + std::to_string(score), 100, 100);
-	setFont("Health: " + std::to_string(spaceship.getHealth()), 100, 120);
+		// Draw enemies, rotating around their arbitrary axis
+		glActiveTexture(GL_TEXTURE1);	
+		glUniform1i(glGetUniformLocation(program, "texUnit"), 1);
+		for (Enemy* e : enemies){
+			mat4 rotation = ArbRotate(e->getPosition(), t*0.5f);
+			e->draw(program, worldMatrix * rotation);
+
+			if (enableShowCollisions){
+				displayCollisionBorders(e);
+			}
+
+			
+		}
+
+		// Draw bullets
+		glActiveTexture(GL_TEXTURE3);
+		glUniform1i(glGetUniformLocation(program, "texUnit"), 3);
+		for (Bullet* b : bullets){
+			b->draw(program, worldMatrix);
+		}
+
+
+		// Draw spaceship and crosshair
+		drawCrossHair();
+		glActiveTexture(GL_TEXTURE2);
+		glUniform1i(glGetUniformLocation(program, "texUnit"), 2);
+		spaceship.draw(program, worldMatrix);
+
+		if (enableShowCollisions){
+				displayCollisionBorders(&spaceship);
+		}
+
+	
+		// UI Fonts for score
+		setFont("Score: " + std::to_string(score), 100, 100);
+		setFont("High score: " + std::to_string(highScore), 100, 120);
+		
+		// UI for health
+		std::string healthString = enableInfiniteHealth ? "oo" : std::to_string(spaceship.getHealth());
+		setFont("Health: " + healthString, 100, 140);
+
+
+		// UI for controls
+		setFont("Move: WASD", 400, 100);
+		setFont("Collisions: J", 400, 120);
+		setFont("Enemy spawn: K", 400, 140);
+		setFont("Inf health: L", 400, 160);
+
+
+		// Extra check to remove all enemies if player death
+		if (!isPlaying){
+			switchEnemySpawn(false);
+		}
+	
+	}
 
 
 	// Post display
@@ -480,6 +604,7 @@ int main(int argc, char *argv[])
 
 	// Init
 	glutDisplayFunc(display); 
+	glutKeyboardFunc(keyboard);	// Using keyboard
 	init ();
 	glutMainLoop();
 	return 0;
